@@ -1,9 +1,41 @@
-// src/app/admin/sanggahan/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
-import Image from 'next/image';
+/**
+ * ============================================================
+ * SI-ELIGIBLE REBUTTAL JUSTICE SYSTEM v2.0
+ * ============================================================
+ * Module: Admin Grade Appeal Reviewer
+ * Style: Alpha-Gen Professional 3D (Light Mode)
+ * Logic: Real-time Review & Comparison Engine
+ * ============================================================
+ */
 
+import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  ShieldAlert, 
+  CheckCircle2, 
+  XCircle, 
+  Clock, 
+  ArrowLeft, 
+  ChevronRight, 
+  Eye, 
+  MessageSquare, 
+  User, 
+  Hash, 
+  FileText, 
+  ArrowRightLeft,
+  Sparkles,
+  Zap,
+  Image as ImageIcon,
+  ExternalLink,
+  Info,
+  History
+} from 'lucide-react';
+import { Button } from "@/components/ui/button";
+
+// --- INTERFACE (TETAP SAMA) ---
 interface Sanggahan {
   id: string;
   siswa: {
@@ -28,12 +60,19 @@ export default function SanggahanPage() {
   const [filter, setFilter] = useState('pending');
   const [selectedSanggahan, setSelectedSanggahan] = useState<Sanggahan | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [academicYear, setAcademicYear] = useState("");
 
+  // Logika Tahun Ajaran Real-time
   useEffect(() => {
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    setAcademicYear(month >= 7 ? `${now.getFullYear()}/${now.getFullYear() + 1}` : `${now.getFullYear() - 1}/${now.getFullYear()}`);
     fetchSanggahan();
   }, [filter]);
 
+  // --- LOGIKA FETCHING (TETAP SAMA) ---
   const fetchSanggahan = async () => {
+    setLoading(true);
     try {
       const res = await fetch(`/api/admin/sanggahan?status=${filter}`);
       if (res.ok) {
@@ -41,7 +80,7 @@ export default function SanggahanPage() {
         setSanggahan(data);
       }
     } catch (error) {
-      console.error('Error fetching sanggahan:', error);
+      console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
     }
@@ -54,335 +93,301 @@ export default function SanggahanPage() {
 
   const handleApprove = async () => {
     if (!selectedSanggahan) return;
-
     try {
       const res = await fetch(`/api/admin/sanggahan/${selectedSanggahan.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'approved' })
       });
-
       if (res.ok) {
-        alert('Sanggahan disetujui!');
         setShowModal(false);
         fetchSanggahan();
       }
-    } catch (error) {
-      console.error('Error approving sanggahan:', error);
-    }
+    } catch (error) { console.error(error); }
   };
 
   const handleReject = async (keterangan: string) => {
     if (!selectedSanggahan) return;
-
     try {
       const res = await fetch(`/api/admin/sanggahan/${selectedSanggahan.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'rejected', keterangan })
       });
-
       if (res.ok) {
-        alert('Sanggahan ditolak!');
         setShowModal(false);
         fetchSanggahan();
       }
-    } catch (error) {
-      console.error('Error rejecting sanggahan:', error);
-    }
+    } catch (error) { console.error(error); }
   };
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">Sanggahan Nilai</h1>
-        <p className="text-gray-600">Review dan approve sanggahan nilai dari siswa</p>
+    <div className="min-h-screen bg-[#FDFEFF] p-4 md:p-8 font-sans text-slate-900 relative overflow-hidden">
+      
+      {/* 1. LAYER DEKORASI ALPHA (AMBIENT BLOBS) */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute top-[-5%] left-[-5%] w-[40%] h-[40%] bg-blue-400/10 rounded-full blur-[140px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[50%] h-[50%] bg-purple-400/10 rounded-full blur-[140px] animate-pulse delay-1000" />
       </div>
 
-      {/* Filter Tabs */}
-      <div className="bg-white rounded-2xl border border-gray-200 mb-6 overflow-hidden">
-        <div className="flex">
-          {[
-            { value: 'pending', label: 'Pending', color: 'yellow' },
-            { value: 'approved', label: 'Disetujui', color: 'green' },
-            { value: 'rejected', label: 'Ditolak', color: 'red' }
-          ].map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => setFilter(tab.value)}
-              className={`flex-1 px-6 py-4 font-medium text-sm transition ${
-                filter === tab.value
-                  ? `bg-${tab.color}-50 text-${tab.color}-600 border-b-2 border-${tab.color}-600`
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Sanggahan List */}
-      {loading ? (
-        <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-          <p className="text-gray-600 mt-4">Memuat data...</p>
-        </div>
-      ) : sanggahan.length === 0 ? (
-        <div className="bg-white rounded-2xl p-12 text-center border border-gray-200">
-          <div className="text-6xl mb-4">📭</div>
-          <p className="text-gray-600">Tidak ada sanggahan dengan status: {filter}</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {sanggahan.map((s) => (
-            <div
-              key={s.id}
-              className="bg-white rounded-2xl p-6 border border-gray-200 hover:shadow-lg transition"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold">
-                      {s.siswa.nama.charAt(0)}
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-800">{s.siswa.nama}</h3>
-                      <p className="text-sm text-gray-600">
-                        {s.siswa.nisn} • Kelas {s.siswa.kelas}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div>
-                      <p className="text-xs text-gray-500">Mata Pelajaran</p>
-                      <p className="font-medium text-gray-800">{s.mataPelajaran}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Semester</p>
-                      <p className="font-medium text-gray-800">{s.semester}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Nilai Lama</p>
-                      <p className="font-medium text-red-600">{s.nilaiLama}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Nilai Baru (Klaim)</p>
-                      <p className="font-medium text-green-600">{s.nilaiBaru}</p>
-                    </div>
-                  </div>
-
-                  {s.keterangan && (
-                    <div className="mb-4 p-3 bg-gray-50 rounded-xl">
-                      <p className="text-xs text-gray-500 mb-1">Keterangan:</p>
-                      <p className="text-sm text-gray-700">{s.keterangan}</p>
-                    </div>
-                  )}
-
-                  <p className="text-xs text-gray-500">
-                    Diajukan: {new Date(s.createdAt).toLocaleDateString('id-ID', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </p>
-                </div>
-
-                <div className="ml-4">
-                  {s.status === 'pending' ? (
-                    <button
-                      onClick={() => handleReview(s)}
-                      className="px-6 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition font-medium"
-                    >
-                      Review
-                    </button>
-                  ) : (
-                    <span className={`px-4 py-2 rounded-xl text-sm font-medium ${
-                      s.status === 'approved'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-red-100 text-red-700'
-                    }`}>
-                      {s.status === 'approved' ? '✓ Disetujui' : '✗ Ditolak'}
-                    </span>
-                  )}
-                </div>
+      <main className="relative z-10 max-w-6xl mx-auto">
+        
+        {/* 2. HEADER SMART NAVIGATION */}
+        <section className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-3 bg-amber-500 rounded-2xl text-white shadow-xl shadow-amber-500/20 transform hover:rotate-12 transition-transform">
+                <ShieldAlert size={24} />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-600 leading-none mb-1">Justice Panel</span>
+                <span className="text-xs font-bold text-slate-400">Review & Dispute Engine</span>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+            <h1 className="text-5xl md:text-7xl font-black tracking-tighter text-slate-900 leading-none uppercase">
+              Sanggahan <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-600 italic">Nilai.</span>
+            </h1>
+            <p className="text-slate-400 font-bold mt-4 flex items-center gap-2 italic">
+              <Clock size={16} /> Monitoring TA {academicYear}
+            </p>
+          </motion.div>
 
-      {/* Modal Review */}
-      {showModal && selectedSanggahan && (
-        <ReviewModal
-          sanggahan={selectedSanggahan}
-          onApprove={handleApprove}
-          onReject={handleReject}
-          onClose={() => setShowModal(false)}
-        />
-      )}
+          {/* FILTER TABS (ALPHA STYLE) */}
+          <div className="bg-white/50 backdrop-blur-md p-1.5 rounded-[2rem] border border-slate-100 shadow-sm flex gap-1 self-start">
+            {[
+              { v: 'pending', l: 'Pending', i: <Clock size={14}/>, c: 'text-amber-500 bg-amber-50' },
+              { v: 'approved', l: 'Approved', i: <CheckCircle2 size={14}/>, c: 'text-emerald-500 bg-emerald-50' },
+              { v: 'rejected', l: 'Rejected', i: <XCircle size={14}/>, c: 'text-red-500 bg-red-50' }
+            ].map((t) => (
+              <button
+                key={t.v}
+                onClick={() => setFilter(t.v)}
+                className={`flex items-center gap-2 px-6 py-3 rounded-full font-black text-[10px] uppercase tracking-widest transition-all ${
+                  filter === t.v ? `${t.c} shadow-md scale-105` : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {t.i} {t.l}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* 3. CONTENT AREA */}
+        <section className="relative">
+          {loading ? (
+            <div className="bg-white rounded-[3rem] p-24 text-center border border-slate-100 shadow-xl">
+              <div className="w-20 h-20 border-8 border-slate-100 border-t-amber-600 rounded-full animate-spin mx-auto mb-6" />
+              <p className="text-xl font-black text-slate-300 uppercase tracking-widest">Memvalidasi Antrian...</p>
+            </div>
+          ) : sanggahan.length === 0 ? (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white rounded-[3rem] p-32 text-center border border-slate-100 shadow-sm">
+              <div className="text-8xl mb-6">🏜️</div>
+              <p className="text-slate-400 font-bold italic text-lg uppercase tracking-widest leading-tight">Tidak ada antrian <br /> data sanggahan.</p>
+            </motion.div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <AnimatePresence mode="popLayout">
+                {sanggahan.map((s, idx) => (
+                  <motion.div
+                    key={s.id}
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ delay: idx * 0.05 }}
+                    whileHover={{ y: -5 }}
+                    className="bg-white rounded-[2.5rem] p-8 border border-slate-50 shadow-[0_20px_50px_rgba(0,0,0,0.03)] group cursor-default relative overflow-hidden"
+                  >
+                    <div className="flex justify-between items-start mb-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 bg-gradient-to-tr from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center text-slate-500 font-black text-xl shadow-inner group-hover:rotate-6 transition-transform">
+                          {s.siswa.nama.charAt(0)}
+                        </div>
+                        <div>
+                          <h3 className="font-black text-slate-800 text-lg uppercase tracking-tight leading-none mb-1 group-hover:text-amber-600 transition-colors">
+                            {s.siswa.nama}
+                          </h3>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.siswa.nisn} • KELAS {s.siswa.kelas}</p>
+                        </div>
+                      </div>
+                      
+                      {s.status === 'pending' ? (
+                        <motion.button
+                          whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                          onClick={() => handleReview(s)}
+                          className="px-6 py-3 bg-amber-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-[0_6px_0_0_#d97706] active:shadow-none active:translate-y-1 transition-all"
+                        >
+                          Review Data
+                        </motion.button>
+                      ) : (
+                        <div className={`px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest ${
+                          s.status === 'approved' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
+                        }`}>
+                          {s.status === 'approved' ? 'Disetujui' : 'Ditolak'}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">Mata Pelajaran</p>
+                        <p className="font-bold text-slate-700 text-sm truncate">{s.mataPelajaran}</p>
+                      </div>
+                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 leading-none">Semester</p>
+                        <p className="font-bold text-slate-700 text-sm">Semester {s.semester}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 pt-6 border-t border-slate-50">
+                      <div className="flex-1">
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Delta Nilai</p>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xl font-black text-red-400 line-through opacity-50">{s.nilaiLama}</span>
+                          <ChevronRight size={14} className="text-slate-300" />
+                          <span className="text-3xl font-black text-emerald-500">{s.nilaiBaru}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 italic">Timestamp</p>
+                        <p className="text-[10px] font-bold text-slate-400">{new Date(s.createdAt).toLocaleDateString('id-ID')}</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
+        </section>
+
+      </main>
+
+      {/* 4. MODAL REVIEW (3D GLASSMORPHISM) */}
+      <AnimatePresence>
+        {showModal && selectedSanggahan && (
+          <ReviewModal
+            sanggahan={selectedSanggahan}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            onClose={() => setShowModal(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-function ReviewModal({
-  sanggahan,
-  onApprove,
-  onReject,
-  onClose
-}: {
-  sanggahan: Sanggahan;
-  onApprove: () => void;
-  onReject: (keterangan: string) => void;
-  onClose: () => void;
-}) {
+// --- SUB COMPONENT: MODAL JUDGE ---
+function ReviewModal({ sanggahan, onApprove, onReject, onClose }: any) {
   const [keterangan, setKeterangan] = useState('');
   const [showRejectForm, setShowRejectForm] = useState(false);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">Review Sanggahan</h2>
-            <button
-              onClick={onClose}
-              className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition"
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* Siswa Info */}
-          <div className="bg-purple-50 rounded-2xl p-6 mb-6">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-16 h-16 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold text-2xl">
-                {sanggahan.siswa.nama.charAt(0)}
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-800">{sanggahan.siswa.nama}</h3>
-                <p className="text-gray-600">
-                  NISN: {sanggahan.siswa.nisn} • Kelas {sanggahan.siswa.kelas}
-                </p>
-              </div>
+    <motion.div 
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-xl flex items-center justify-center z-[100] p-4"
+    >
+      <motion.div 
+        initial={{ scale: 0.9, y: 50 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 50 }}
+        className="bg-white rounded-[3.5rem] max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl relative border border-white"
+      >
+        <button onClick={onClose} className="absolute top-8 right-8 w-12 h-12 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all">✕</button>
+        
+        <div className="p-10 md:p-14">
+          <div className="flex items-center gap-6 mb-12">
+            <div className="w-20 h-20 bg-gradient-to-br from-amber-400 to-orange-600 rounded-[1.75rem] flex items-center justify-center text-white font-black text-4xl shadow-xl shadow-orange-500/20 animate-bounce">
+              {sanggahan.siswa.nama.charAt(0)}
             </div>
-          </div>
-
-          {/* Comparison */}
-          <div className="grid md:grid-cols-2 gap-6 mb-6">
-            <div className="p-6 bg-red-50 border-2 border-red-200 rounded-2xl">
-              <h3 className="font-semibold text-red-800 mb-4">Nilai di Sistem</h3>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm text-gray-600">Mata Pelajaran</p>
-                  <p className="text-lg font-bold text-gray-800">{sanggahan.mataPelajaran}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Semester</p>
-                  <p className="text-lg font-bold text-gray-800">{sanggahan.semester}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Nilai</p>
-                  <p className="text-4xl font-bold text-red-600">{sanggahan.nilaiLama}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-6 bg-green-50 border-2 border-green-200 rounded-2xl">
-              <h3 className="font-semibold text-green-800 mb-4">Nilai Klaim Siswa</h3>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm text-gray-600">Mata Pelajaran</p>
-                  <p className="text-lg font-bold text-gray-800">{sanggahan.mataPelajaran}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Semester</p>
-                  <p className="text-lg font-bold text-gray-800">{sanggahan.semester}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Nilai</p>
-                  <p className="text-4xl font-bold text-green-600">{sanggahan.nilaiBaru}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Bukti Rapor */}
-          <div className="mb-6">
-            <h3 className="font-semibold text-gray-800 mb-3">Bukti Foto Rapor</h3>
-            <div className="border-2 border-gray-200 rounded-2xl overflow-hidden">
-              <img
-                src={sanggahan.buktiRapor}
-                alt="Bukti Rapor"
-                className="w-full h-auto"
-              />
-            </div>
-            
-            <a
-              href={sanggahan.buktiRapor}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block mt-3 text-sm text-purple-600 hover:text-purple-700 font-medium"
-            >
-              🔍 Buka gambar di tab baru
-            </a>
-          </div>
-
-          {/* Action Buttons */}
-          {!showRejectForm ? (
-            <div className="flex gap-4">
-              <button
-                onClick={onApprove}
-                className="flex-1 px-6 py-4 bg-green-600 text-white rounded-xl hover:bg-green-700 transition font-semibold text-lg"
-              >
-                ✓ Setujui Sanggahan
-              </button>
-              <button
-                onClick={() => setShowRejectForm(true)}
-                className="flex-1 px-6 py-4 bg-red-600 text-white rounded-xl hover:bg-red-700 transition font-semibold text-lg"
-              >
-                ✗ Tolak Sanggahan
-              </button>
-            </div>
-          ) : (
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Alasan Penolakan
-              </label>
-              <textarea
-                value={keterangan}
-                onChange={(e) => setKeterangan(e.target.value)}
-                placeholder="Tuliskan alasan penolakan..."
-                rows={4}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 mb-4"
-              />
-              <div className="flex gap-4">
-                <button
-                  onClick={() => {
-                    if (keterangan.trim()) {
-                      onReject(keterangan);
-                    } else {
-                      alert('Alasan penolakan harus diisi');
-                    }
-                  }}
-                  className="flex-1 px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition font-medium"
-                >
-                  Kirim Penolakan
-                </button>
-                <button
-                  onClick={() => setShowRejectForm(false)}
-                  className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition font-medium"
-                >
-                  Batal
-                </button>
+              <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tighter leading-none mb-2">{sanggahan.siswa.nama}</h2>
+              <p className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <Hash size={14} className="text-amber-500" /> {sanggahan.siswa.nisn} <span className="opacity-30">|</span> <GraduationCap size={14} className="text-blue-500" /> Kelas {sanggahan.siswa.kelas}
+              </p>
+            </div>
+          </div>
+
+          {/* ANALYSIS GRID */}
+          <div className="grid md:grid-cols-2 gap-8 mb-12">
+            <div className="p-8 bg-red-50/50 rounded-[2.5rem] border-2 border-dashed border-red-100 flex flex-col justify-between">
+              <div>
+                <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-2 leading-none italic">Original Record</p>
+                <h4 className="text-2xl font-black text-slate-800 leading-tight uppercase">{sanggahan.mataPelajaran}</h4>
+              </div>
+              <div className="mt-10">
+                <p className="text-[10px] font-black text-red-300 uppercase tracking-widest mb-1">Sistem Nilai</p>
+                <p className="text-7xl font-black text-red-500 tracking-tighter opacity-80">{sanggahan.nilaiLama}</p>
               </div>
             </div>
-          )}
+
+            <div className="p-8 bg-emerald-50/50 rounded-[2.5rem] border-2 border-emerald-100 flex flex-col justify-between relative overflow-hidden">
+              <Sparkles className="absolute top-6 right-6 text-emerald-200" size={32} />
+              <div>
+                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2 leading-none italic">Student Claim</p>
+                <h4 className="text-2xl font-black text-slate-800 leading-tight uppercase">{sanggahan.mataPelajaran}</h4>
+              </div>
+              <div className="mt-10">
+                <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">Bukti Klaim</p>
+                <p className="text-7xl font-black text-emerald-600 tracking-tighter">{sanggahan.nilaiBaru}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* BUKTI RAPOR PREVIEW */}
+          <div className="mb-12">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                <ImageIcon size={18} /> Verifikasi Visual Bukti Rapor
+              </h3>
+              <a href={sanggahan.buktiRapor} target="_blank" rel="noopener noreferrer" className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2 hover:underline">
+                <ExternalLink size={12} /> Open High-Res
+              </a>
+            </div>
+            <div className="bg-slate-900 rounded-[3rem] p-4 shadow-inner relative group">
+              <img src={sanggahan.buktiRapor} alt="Evidence" className="w-full h-auto rounded-[2rem] object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute inset-0 rounded-[3rem] shadow-[inset_0_0_100px_rgba(0,0,0,0.2)] pointer-events-none" />
+            </div>
+          </div>
+
+          {/* ACTION BUTTONS (CLAYMORPHISM) */}
+          <div className="space-y-6">
+            {!showRejectForm ? (
+              <div className="flex flex-col md:flex-row gap-6">
+                <motion.button
+                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                  onClick={onApprove}
+                  className="flex-[2] h-24 bg-emerald-500 hover:bg-emerald-600 text-white rounded-[2rem] font-black text-2xl shadow-[0_12px_0_0_#059669] active:shadow-none active:translate-y-3 transition-all flex items-center justify-center gap-4 group"
+                >
+                  SETUJUI PERUBAHAN <CheckCircle2 size={28} className="group-hover:rotate-12 transition-transform" />
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowRejectForm(true)}
+                  className="flex-1 h-24 bg-slate-100 text-slate-400 rounded-[2rem] font-black text-xl hover:bg-red-50 hover:text-red-500 transition-all"
+                >
+                  TOLAK
+                </motion.button>
+              </div>
+            ) : (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-red-400 ml-2">Alasan Penolakan (Wajib)</label>
+                  <textarea
+                    value={keterangan}
+                    onChange={(e) => setKeterangan(e.target.value)}
+                    placeholder="Contoh: Bukti foto tidak jelas atau buram..."
+                    rows={4}
+                    className="w-full p-8 rounded-[2rem] bg-slate-50 border-none focus:ring-4 focus:ring-red-500/10 transition-all font-bold text-slate-700 shadow-inner"
+                  />
+                </div>
+                <div className="flex gap-4">
+                  <button onClick={() => { if(keterangan.trim()) onReject(keterangan); else alert('Alasan harus diisi'); }} className="flex-[2] py-6 bg-red-500 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-[0_8px_0_0_#b91c1c] active:shadow-none active:translate-y-2 transition-all">Kirim Penolakan</button>
+                  <button onClick={() => setShowRejectForm(false)} className="flex-1 py-6 bg-slate-100 text-slate-400 rounded-2xl font-black text-sm uppercase tracking-widest">Batal</button>
+                </div>
+              </motion.div>
+            )}
+          </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

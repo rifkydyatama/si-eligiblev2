@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/lib/prisma';
 import ExcelJS from 'exceljs';
-import { Buffer } from 'buffer'; // Ensure Node.js Buffer is used
+import { Buffer } from 'buffer';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,145 +17,114 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File;
 
-    if (!file) {
-      return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 400 });
-    }
+    if (!file) return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 400 });
 
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(new Uint8Array(arrayBuffer)); // Ensure compatibility with ExcelJS
+    const buffer = Buffer.from(new Uint8Array(arrayBuffer));
 
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer as any);
 
     const worksheet = workbook.getWorksheet(1);
-    if (!worksheet) {
-      return NextResponse.json({ error: 'Worksheet tidak ditemukan' }, { status: 400 });
-    }
+    if (!worksheet) return NextResponse.json({ error: 'Worksheet tidak ditemukan' }, { status: 400 });
 
-    type NilaiData = {
-      nisn: string;
-      semester: number;
-      mataPelajaran: string;
-      nilai: number;
-    };
-
-    const nilaiData: NilaiData[] = [];
-    const errors: string[] = [];
-
-    // Format Excel yang diharapkan:
-    // Kolom: NISN | Semester | Mata Pelajaran | Nilai
+    // --- LOGIKA SMART MAPPING (Mencari Kolom Otomatis) ---
+    let colMap: { [key: string]: number } = {};
+    const headerRow = worksheet.getRow(1);
     
-    worksheet.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return; // Skip header
-
-      const nisn = row.getCell(1).value?.toString().trim();
-      const semester = parseInt(row.getCell(2).value?.toString() || '0');
-      const mataPelajaran = row.getCell(3).value?.toString().trim();
-      const nilai = parseFloat(row.getCell(4).value?.toString() || '0');
-
-      if (!nisn) {
-        errors.push(`Baris ${rowNumber}: NISN tidak boleh kosong`);
-        return;
-      }
-
-      if (semester < 1 || semester > 5) {
-        errors.push(`Baris ${rowNumber}: Semester harus 1-5`);
-        return;
-      }
-
-      if (!mataPelajaran) {
-        errors.push(`Baris ${rowNumber}: Mata pelajaran tidak boleh kosong`);
-        return;
-      }
-
-      if (nilai < 0 || nilai > 100) {
-        errors.push(`Baris ${rowNumber}: Nilai harus 0-100`);
-        return;
-      }
-
-      nilaiData.push({
-        nisn,
-        semester,
-        mataPelajaran,
-        nilai
-      });
+    headerRow.eachCell((cell, colNumber) => {
+      const headerText = cell.value?.toString().toLowerCase().trim() || '';
+      if (headerText.includes('nisn')) colMap.nisn = colNumber;
+      if (headerText.includes('semester')) colMap.semester = colNumber;
+      if (headerText.includes('mapel') || headerText.includes('mata pelajaran') || headerText.includes('pelajaran')) colMap.subject = colNumber;
+      if (headerText.includes('nilai') || headerText.includes('angka') || headerText.includes('skor')) colMap.score = colNumber;
     });
 
-    if (errors.length > 0) {
+    if (!colMap.nisn || !colMap.semester || !colMap.subject || !colMap.score) {
       return NextResponse.json({ 
-        error: 'Validasi gagal', 
-        errors 
+        error: 'Format kolom tidak dikenali. Pastikan ada kolom NISN, Semester, Mata Pelajaran, dan Nilai.' 
       }, { status: 400 });
     }
 
-    // Resolve NISN to siswaId
     let successCount = 0;
     let notFoundCount = 0;
+    const errors: string[] = [];
+    const rows: any[] = [];
+    
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+      rows.push(row);
+    });
 
-    for (const data of nilaiData) {
+    for (const row of rows) {
+      const nisn = row.getCell(colMap.nisn).value?.toString().trim();
+      const semester = parseInt(row.getCell(colMap.semester).value?.toString() || '0');
+      const subjectName = row.getCell(colMap.subject).value?.toString().trim();
+      const score = parseFloat(row.getCell(colMap.score).value?.toString() || '0');
+
+      if (!nisn || isNaN(semester) || !subjectName) continue;
+
       try {
-        const siswa = await prisma.siswa.findUnique({
-          where: { nisn: data.nisn }
-        });
-
-        if (!siswa) {
+        // 1. Cari Student berdasarkan NISN
+        const student = await prisma.student.findUnique({ where: { nisn } });
+        if (!student) {
           notFoundCount++;
-          errors.push(`NISN ${data.nisn} tidak ditemukan`);
           continue;
         }
 
-        // Upsert nilai
-        await prisma.nilaiRapor.upsert({
+        // 2. Cari atau Buat Subject (Mata Pelajaran)
+        let subject = await prisma.subject.findFirst({
+          where: { name: { equals: subjectName } }
+        });
+
+        if (!subject) {
+          subject = await prisma.subject.create({
+            data: { name: subjectName, isVocational: false }
+          });
+        }
+
+        // 3. Upsert Grade (Nilai) - Menggunakan Unique Constraint
+        await prisma.grade.upsert({
           where: {
-            siswaId_semester_mataPelajaran: {
-              siswaId: siswa.id,
-              semester: data.semester,
-              mataPelajaran: data.mataPelajaran
+            studentId_subjectId_semester: {
+              studentId: student.id,
+              subjectId: subject.id,
+              semester: semester
             }
           },
-          update: {
-            nilai: data.nilai
-          },
+          update: { score: score },
           create: {
-            siswaId: siswa.id,
-            semester: data.semester,
-            mataPelajaran: data.mataPelajaran,
-            nilai: data.nilai,
-            isVerified: false
+            studentId: student.id,
+            subjectId: subject.id,
+            semester: semester,
+            score: score
           }
         });
 
         successCount++;
       } catch (error) {
-        console.error('Error inserting nilai:', error);
-        errors.push(`Gagal insert nilai ${data.nisn} - ${data.mataPelajaran}: ${error}`);
+        console.error('Error row processing:', error);
+        errors.push(`Gagal memproses baris ${row.number}: ${nisn}`);
       }
     }
 
-    // Log audit
+    // 4. Log Audit sesuai Schema
     await prisma.auditLog.create({
       data: {
-        userId: session.user.userId,
-        userType: session.user.role,
+        adminId: Number(session.user.userId),
         action: 'import_nilai',
-        description: `Import ${successCount} nilai dari Excel`,
-        metadata: {
-          successCount,
-          notFoundCount,
-          totalRows: nilaiData.length
-        }
+        details: `Import ${successCount} nilai e-Rapor. NISN tidak ditemukan: ${notFoundCount}`,
       }
     });
 
     return NextResponse.json({
-      message: 'Import selesai',
       successCount,
       notFoundCount,
-      totalRows: nilaiData.length,
+      totalRows: rows.length,
       errors
     });
   } catch (error) {
-    console.error('Error importing nilai:', error);
+    console.error('Import Error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

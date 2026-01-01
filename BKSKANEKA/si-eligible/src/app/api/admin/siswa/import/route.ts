@@ -20,17 +20,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 400 });
     }
 
-    // Convert file to Buffer
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(new Uint8Array(bytes));
 
-    // Parse Excel dengan ExcelJS
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer as any);
 
     const worksheet = workbook.getWorksheet(1);
     if (!worksheet) {
       return NextResponse.json({ error: 'Worksheet tidak ditemukan' }, { status: 400 });
+    }
+
+    // --- LOGIKA SMART MAPPING DAPODIK ---
+    // Mencari indeks kolom berdasarkan nama header (tidak sensitif huruf besar/kecil)
+    let colMap: { [key: string]: number } = {};
+    const headerRow = worksheet.getRow(1);
+    
+    headerRow.eachCell((cell, colNumber) => {
+      const headerText = cell.value?.toString().toLowerCase().trim() || '';
+      
+      if (headerText.includes('nisn')) colMap.nisn = colNumber;
+      if (headerText.includes('nama')) colMap.nama = colNumber;
+      if (headerText.includes('lahir') && (headerText.includes('tanggal') || headerText.includes('tgl'))) colMap.tanggalLahir = colNumber;
+      if (headerText.includes('kelas') || headerText.includes('rombel')) colMap.kelas = colNumber;
+      if (headerText.includes('jurusan') || headerText.includes('kompetensi')) colMap.jurusan = colNumber;
+      if (headerText.includes('email')) colMap.email = colNumber;
+      if (headerText.includes('telepon') || headerText.includes('hp') || headerText.includes('ponsel')) colMap.noTelepon = colNumber;
+      if (headerText.includes('kip') || headerText.includes('kks') || headerText.includes('kps') || headerText.includes('penerima')) colMap.statusKIPK = colNumber;
+    });
+
+    // Validasi apakah kolom minimal (NISN & Nama) ditemukan
+    if (!colMap.nisn || !colMap.nama) {
+      return NextResponse.json({ 
+        error: 'Format kolom tidak dikenali. Pastikan Excel memiliki header "NISN" dan "Nama".' 
+      }, { status: 400 });
     }
 
     type SiswaData = {
@@ -47,66 +70,61 @@ export async function POST(request: NextRequest) {
     const siswaData: SiswaData[] = [];
     const errors: string[] = [];
 
-    // Read rows (skip header)
+    // Membaca baris (mulai baris ke-2)
     worksheet.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return; // Skip header
+      if (rowNumber === 1) return; // Lewati header
 
-      const nisn = row.getCell(1).value?.toString().trim();
-      const nama = row.getCell(2).value?.toString().trim();
-      const tanggalLahir = row.getCell(3).value;
-      const kelas = row.getCell(4).value?.toString().trim();
-      const jurusan = row.getCell(5).value?.toString().trim();
-      const email = row.getCell(6).value?.toString().trim();
-      const noTelepon = row.getCell(7).value?.toString().trim();
-      const statusKIPK = row.getCell(8).value?.toString().toLowerCase() === 'ya';
+      const nisn = row.getCell(colMap.nisn).value?.toString().trim();
+      const nama = row.getCell(colMap.nama).value?.toString().trim();
+      const rawTanggalLahir = colMap.tanggalLahir ? row.getCell(colMap.tanggalLahir).value : null;
+      const kelas = colMap.kelas ? row.getCell(colMap.kelas).value?.toString().trim() : '12';
+      const jurusan = colMap.jurusan ? row.getCell(colMap.jurusan).value?.toString().trim() : '-';
+      const email = colMap.email ? row.getCell(colMap.email).value?.toString().trim() : null;
+      const noTelepon = colMap.noTelepon ? row.getCell(colMap.noTelepon).value?.toString().trim() : null;
+      
+      // Deteksi KIPK (jika kolom ada dan berisi "Ya", "1", atau "True")
+      const kipkValue = colMap.statusKIPK ? row.getCell(colMap.statusKIPK).value?.toString().toLowerCase() : '';
+      const statusKIPK = kipkValue === 'ya' || kipkValue === '1' || kipkValue === 'true' || kipkValue === 'penerima';
 
-      // Validasi
-      if (!nisn || nisn.length !== 10) {
+      // Validasi baris wajib
+      if (!nisn || nisn.length < 8) {
         errors.push(`Baris ${rowNumber}: NISN tidak valid (${nisn})`);
         return;
       }
-
       if (!nama) {
         errors.push(`Baris ${rowNumber}: Nama tidak boleh kosong`);
         return;
       }
 
-      if (!tanggalLahir) {
-        errors.push(`Baris ${rowNumber}: Tanggal lahir tidak boleh kosong`);
-        return;
-      }
-
-      // Parse tanggal
+      // Parsing Tanggal Lahir (Handel format Excel Date atau String)
       let parsedDate: Date;
-      if (tanggalLahir instanceof Date) {
-        parsedDate = tanggalLahir;
-      } else if (typeof tanggalLahir === 'number') {
-        // Excel serial date
-        parsedDate = new Date((tanggalLahir - 25569) * 86400 * 1000);
+      if (rawTanggalLahir instanceof Date) {
+        parsedDate = rawTanggalLahir;
+      } else if (typeof rawTanggalLahir === 'number') {
+        parsedDate = new Date((rawTanggalLahir - 25569) * 86400 * 1000);
+      } else if (rawTanggalLahir) {
+        parsedDate = new Date(rawTanggalLahir.toString());
       } else {
-        parsedDate = new Date(tanggalLahir.toString());
+        parsedDate = new Date(); // Fallback jika kosong
       }
 
       siswaData.push({
         nisn,
         nama,
         tanggalLahir: parsedDate,
-        kelas: kelas || '12',
-        jurusan: jurusan || 'IPA',
+        kelas,
+        jurusan,
         email: email || null,
         noTelepon: noTelepon || null,
         statusKIPK
       });
     });
 
-    if (errors.length > 0) {
-      return NextResponse.json({ 
-        error: 'Validasi gagal', 
-        errors 
-      }, { status: 400 });
+    if (errors.length > 0 && siswaData.length === 0) {
+      return NextResponse.json({ error: 'Data tidak valid', errors }, { status: 400 });
     }
 
-    // Bulk insert dengan check duplicate
+    // --- PROSES DATABASE (TETAP SAMA) ---
     let successCount = 0;
     let duplicateCount = 0;
 
@@ -125,22 +143,16 @@ export async function POST(request: NextRequest) {
         successCount++;
       } catch (error) {
         console.error('Error inserting siswa:', error);
-        errors.push(`Gagal insert siswa ${data.nama}: ${error}`);
+        errors.push(`Gagal simpan ${data.nama}: ${error}`);
       }
     }
 
-    // Log audit
+    // Log audit sesuai schema AuditLog
     await prisma.auditLog.create({
       data: {
-        userId: session.user.userId,
-        userType: session.user.role,
+        adminId: Number(session.user.userId),
         action: 'import_siswa',
-        description: `Import ${successCount} siswa dari Excel`,
-        metadata: {
-          successCount,
-          duplicateCount,
-          totalRows: siswaData.length
-        }
+        details: `Import ${successCount} siswa (Dapodik Mapped). Duplikat: ${duplicateCount}`
       }
     });
 
@@ -151,6 +163,7 @@ export async function POST(request: NextRequest) {
       totalRows: siswaData.length,
       errors
     });
+
   } catch (error) {
     console.error('Error importing siswa:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

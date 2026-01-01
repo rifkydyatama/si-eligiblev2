@@ -8,25 +8,27 @@ datasource db {
 }
 
 model Siswa {
-  id           String       @id @default(cuid())
-  nisn         String       @unique
-  nama         String
-  tanggalLahir DateTime
-  kelas        String
-  jurusan      String
-  email        String?
-  noTelepon    String?
-  statusKIPK   Boolean      @default(false)
-  isDataLocked Boolean      @default(false)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  kelulusan    Kelulusan?
-  nilaiRapor   NilaiRapor[]
-  peminatan    Peminatan[]
-  sanggahan    Sanggahan[]
+  id              String          @id @default(cuid())
+  nisn            String          @unique
+  nama            String
+  tanggalLahir    DateTime
+  kelas           String
+  jurusanId       String?
+  email           String?
+  noTelepon       String?
+  statusKIPK      Boolean         @default(false)
+  isDataLocked    Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  jurusanSekolah  JurusanSekolah? @relation(fields: [jurusanId], references: [id])
+  kelulusan       Kelulusan?
+  nilaiRapor      NilaiRapor[]
+  peminatan       Peminatan[]
+  sanggahan       Sanggahan[]
 
   @@index([nisn])
-  @@index([kelas, jurusan])
+  @@index([kelas, jurusanId])
+  @@index([jurusanId])
 }
 
 model Peminatan {
@@ -219,6 +221,20 @@ model MasterJurusan {
 
   @@unique([kampusId, kodeJurusan])
   @@index([kampusId])
+}
+
+model JurusanSekolah {
+  id        String   @id @default(cuid())
+  kode      String   @unique
+  nama      String
+  tingkat   String   // SMA atau SMK
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  siswa     Siswa[]
+
+  @@index([kode])
+  @@index([tingkat])
 }
 
 model Admin {
