@@ -8,23 +8,24 @@ datasource db {
 }
 
 model Siswa {
-  id              String          @id @default(cuid())
-  nisn            String          @unique
-  nama            String
-  tanggalLahir    DateTime
-  kelas           String
-  jurusanId       String?
-  email           String?
-  noTelepon       String?
-  statusKIPK      Boolean         @default(false)
-  isDataLocked    Boolean         @default(false)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  jurusanSekolah  JurusanSekolah? @relation(fields: [jurusanId], references: [id])
-  kelulusan       Kelulusan?
-  nilaiRapor      NilaiRapor[]
-  peminatan       Peminatan[]
-  sanggahan       Sanggahan[]
+  id             String          @id @default(cuid())
+  nisn           String          @unique
+  nama           String
+  tanggalLahir   DateTime
+  kelas          String
+  email          String?
+  noTelepon      String?
+  statusKIPK     Boolean         @default(false)
+  isDataLocked   Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  jurusanId      String?
+  mendaftarKIPK  Boolean         @default(false)
+  kelulusan      Kelulusan[]
+  nilaiRapor     NilaiRapor[]
+  peminatan      Peminatan[]
+  sanggahan      Sanggahan[]
+  jurusanSekolah JurusanSekolah? @relation(fields: [jurusanId], references: [id])
 
   @@index([nisn])
   @@index([kelas, jurusanId])
@@ -51,57 +52,65 @@ model Peminatan {
 }
 
 model Sanggahan {
-  id            String    @id @default(cuid())
+  id            String     @id @default(cuid())
   siswaId       String
   semester      Int
   mataPelajaran String
   nilaiLama     Float
   nilaiBaru     Float
-  buktiRapor    String
-  status        String    @default("pending")
-  keterangan    String?   @db.Text
+  buktiRapor    String?    @db.LongText
+  status        String     @default("pending")
+  keterangan    String?    @db.Text
   reviewedBy    String?
   reviewedAt    DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  siswa         Siswa     @relation(fields: [siswaId], references: [id], onDelete: Cascade)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  alasan        String?    @db.Text
+  nilaiId       String?
+  siswa         Siswa      @relation(fields: [siswaId], references: [id], onDelete: Cascade)
+  nilaiRapor    NilaiRapor? @relation(fields: [nilaiId], references: [id], onDelete: SetNull)
 
   @@index([siswaId])
   @@index([status])
+  @@index([semester])
 }
 
 model Kelulusan {
-  id              String        @id @default(cuid())
-  siswaId         String        @unique
+  id              String         @id @default(cuid())
+  siswaId         String
   status          String
-  kampusId        String
-  jurusanId       String
+  kampusId        String?
+  jurusanId       String?
   jalur           String
-  buktiPenerimaan String
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  jurusan         MasterJurusan @relation(fields: [jurusanId], references: [id])
-  kampus          MasterKampus  @relation(fields: [kampusId], references: [id])
-  siswa           Siswa         @relation(fields: [siswaId], references: [id], onDelete: Cascade)
+  buktiPenerimaan String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  kampus          MasterKampus?  @relation(fields: [kampusId], references: [id])
+  jurusan         MasterJurusan? @relation(fields: [jurusanId], references: [id])
+  siswa           Siswa          @relation(fields: [siswaId], references: [id], onDelete: Cascade)
 
+  @@index([siswaId])
   @@index([jurusanId], map: "Kelulusan_jurusanId_fkey")
   @@index([kampusId], map: "Kelulusan_kampusId_fkey")
 }
 
 model NilaiRapor {
-  id            String   @id @default(cuid())
+  id            String      @id @default(cuid())
   siswaId       String
   semester      Int
   mataPelajaran String
   nilai         Float
-  isVerified    Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  siswa         Siswa    @relation(fields: [siswaId], references: [id], onDelete: Cascade)
+  isVerified    Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  headerIndex   Int?
+  siswa         Siswa       @relation(fields: [siswaId], references: [id], onDelete: Cascade)
+  sanggahan     Sanggahan[]
 
   @@unique([siswaId, semester, mataPelajaran], name: "siswaId_semester_mataPelajaran")
   @@index([siswaId])
   @@index([semester])
+  @@index([isVerified])
 }
 
 model TahunAkademik {
@@ -194,9 +203,9 @@ model MasterKampus {
   tahunUpdate   String
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
-  kelulusan     Kelulusan[]
   jurusan       MasterJurusan[]
   peminatan     Peminatan[]
+  kelulusan     Kelulusan[]
 
   @@index([jenisKampus])
   @@index([kategoriJalur])
@@ -215,9 +224,9 @@ model MasterJurusan {
   tahunUpdate String
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
-  kelulusan   Kelulusan[]
   kampus      MasterKampus @relation(fields: [kampusId], references: [id], onDelete: Cascade)
   peminatan   Peminatan[]
+  kelulusan   Kelulusan[]
 
   @@unique([kampusId, kodeJurusan])
   @@index([kampusId])
@@ -227,7 +236,7 @@ model JurusanSekolah {
   id        String   @id @default(cuid())
   kode      String   @unique
   nama      String
-  tingkat   String   // SMA atau SMK
+  tingkat   String
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -275,6 +284,58 @@ model TemplateExport {
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  fileTemplate    String?
 
   @@index([jalur])
+  @@index([jenisExport])
+}
+
+model MapelMapping {
+  id                  String   @id @default(cuid())
+  tahunAkademikId     String?
+  mataPelajaranSistem String   @unique
+  mataPelajaranPDSS   String?
+  mataPelajaranPTKIN  String?
+  kategori            String
+  kelompok            String?
+  kodeMapel           String?
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([kategori])
+}
+
+model TemplateNilaiPDSS {
+  id               String   @id @default(cuid())
+  tahunAkademikId  String
+  namaTemplate     String
+  semester         Int
+  strukturTemplate Json
+  mappingMapel     Json
+  formatSheet      Json
+  fileTemplate     String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([tahunAkademikId])
+  @@index([semester])
+}
+
+model TemplateNilaiPTKIN {
+  id               String   @id @default(cuid())
+  tahunAkademikId  String
+  namaTemplate     String
+  semester         Int
+  strukturTemplate Json
+  mappingMapel     Json
+  formatSheet      Json
+  fileTemplate     String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([tahunAkademikId])
+  @@index([semester])
 }

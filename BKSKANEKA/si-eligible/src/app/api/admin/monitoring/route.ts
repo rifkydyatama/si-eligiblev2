@@ -30,35 +30,38 @@ export async function GET() {
       LIMIT 12
     `;
 
-    // Get distribution by campus type using raw SQL
+    // Get distribution by campus type using raw SQL (only lulus status)
     const kelulusanByKampusTypeRaw = await prisma.$queryRaw<Array<{ jenisKampus: string; count: number }>>`
       SELECT
         k.jenisKampus,
         COUNT(kl.id) as count
       FROM Kelulusan kl
-      JOIN MasterKampus k ON kl.kampusId = k.id
+      LEFT JOIN MasterKampus k ON kl.kampusId = k.id
+      WHERE kl.status = 'lulus' AND kl.kampusId IS NOT NULL
       GROUP BY k.jenisKampus
       ORDER BY count DESC
     `;
 
-    // Get distribution by major using raw SQL
+    // Get distribution by major using raw SQL (only lulus status)
     const kelulusanByJurusanRaw = await prisma.$queryRaw<Array<{ namaJurusan: string; count: number }>>`
       SELECT
         j.namaJurusan,
         COUNT(kl.id) as count
       FROM Kelulusan kl
-      JOIN MasterJurusan j ON kl.jurusanId = j.id
+      LEFT JOIN MasterJurusan j ON kl.jurusanId = j.id
+      WHERE kl.status = 'lulus' AND kl.jurusanId IS NOT NULL
       GROUP BY j.namaJurusan
       ORDER BY count DESC
     `;
 
-    // Get top campuses using raw SQL
+    // Get top campuses using raw SQL (only lulus status)
     const topKampusRaw = await prisma.$queryRaw<Array<{ namaKampus: string; count: number }>>`
       SELECT
         k.namaKampus,
         COUNT(kl.id) as count
       FROM Kelulusan kl
-      JOIN MasterKampus k ON kl.kampusId = k.id
+      LEFT JOIN MasterKampus k ON kl.kampusId = k.id
+      WHERE kl.status = 'lulus' AND kl.kampusId IS NOT NULL
       GROUP BY k.namaKampus
       ORDER BY count DESC
       LIMIT 10

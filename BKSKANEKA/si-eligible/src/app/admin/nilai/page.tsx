@@ -39,6 +39,30 @@ export default function DataNilaiPage() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
   const [academicYear, setAcademicYear] = useState("");
+  const [selectedJurusan, setSelectedJurusan] = useState("");
+  const [jurusanList, setJurusanList] = useState<any[]>([]);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [selectedSemester, setSelectedSemester] = useState("");
+
+  // Fetch jurusan list
+  useEffect(() => {
+    fetchJurusan();
+  }, []);
+
+  const fetchJurusan = async () => {
+    try {
+      const res = await fetch('/api/admin/konfigurasi/jurusan-sekolah');
+      if (res.ok) {
+        const data = await res.json();
+        console.log('Jurusan data loaded:', data); // Debug
+        setJurusanList(data);
+      } else {
+        console.error('Failed to fetch jurusan, status:', res.status);
+      }
+    } catch (error) {
+      console.error('Error fetching jurusan:', error);
+    }
+  };
 
   // Logic Tahun Real-time
   useEffect(() => {
@@ -68,6 +92,12 @@ export default function DataNilaiPage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      if (selectedJurusan) {
+        formData.append('jurusanId', selectedJurusan);
+      }
+      if (selectedSemester) {
+        formData.append('semester', selectedSemester);
+      }
 
       const res = await fetch('/api/admin/nilai/import', {
         method: 'POST',
@@ -80,7 +110,7 @@ export default function DataNilaiPage() {
       } else {
         setError(data.error || 'Terjadi anomali saat integrasi data nilai.');
       }
-    } catch (err: any) {
+    } catch (err) {
       setError('Koneksi sistem terputus. Sila coba beberapa saat lagi.');
     } finally {
       setLoading(false);
@@ -95,6 +125,45 @@ export default function DataNilaiPage() {
     a.href = url;
     a.download = 'template_import_nilai_v2.csv';
     a.click();
+  };
+
+  const handleExport = async () => {
+    if (!selectedJurusan && !selectedSemester) {
+      if (!confirm('Anda akan mengekspor SEMUA data nilai. Lanjutkan?')) {
+        return;
+      }
+    }
+
+    setExportLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/admin/nilai/export-excel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jurusanId: selectedJurusan || undefined,
+          semester: selectedSemester || undefined,
+        })
+      });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Nilai_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        const error = await res.json();
+        setError(error.error || 'Gagal mengekspor data nilai');
+      }
+    } catch (err) {
+      setError('Koneksi sistem terputus. Silakan coba lagi.');
+    } finally {
+      setExportLoading(false);
+    }
   };
 
   return (
@@ -128,11 +197,33 @@ export default function DataNilaiPage() {
             </p>
           </motion.div>
 
-          <Link href="/admin/dashboard">
-            <Button variant="outline" className="h-16 px-10 rounded-3xl border-slate-100 font-black text-xs uppercase tracking-widest text-slate-400 hover:text-slate-900 shadow-sm hover:shadow-md transition-all active:scale-95">
-              <ArrowLeft size={18} className="mr-3" /> Dashboard
-            </Button>
-          </Link>
+          <div className="flex gap-4">
+            <Link href="/admin/dashboard">
+              <Button variant="outline" className="h-16 px-10 rounded-3xl border-slate-100 font-black text-xs uppercase tracking-widest text-slate-400 hover:text-slate-900 shadow-sm hover:shadow-md transition-all active:scale-95">
+                <ArrowLeft size={18} className="mr-3" /> Dashboard
+              </Button>
+            </Link>
+            
+            <motion.button
+              onClick={handleExport}
+              disabled={exportLoading}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="h-16 px-10 rounded-3xl bg-green-600 text-white font-black text-xs uppercase tracking-widest hover:bg-green-700 shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center gap-3 disabled:opacity-50"
+            >
+              {exportLoading ? (
+                <>
+                  <RefreshCcw className="animate-spin" size={18} />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <Download size={18} />
+                  Export Excel
+                </>
+              )}
+            </motion.button>
+          </div>
         </section>
 
         <div className="grid lg:grid-cols-12 gap-10">
@@ -169,6 +260,58 @@ export default function DataNilaiPage() {
                   </button>
                 </motion.div>
               )}
+
+              {/* Filter Jurusan */}
+              <div className="mt-6">
+                <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4 mb-3 block">
+                  Filter Jurusan (Opsional)
+                </label>
+                <select
+                  value={selectedJurusan}
+                  onChange={(e) => setSelectedJurusan(e.target.value)}
+                  className="w-full h-16 px-6 rounded-3xl bg-white border-4 border-slate-50 focus:border-indigo-200 font-bold text-slate-700 shadow-sm appearance-none"
+                >
+                  <option value="">Semua Jurusan</option>
+                  {jurusanList.length === 0 ? (
+                    <option value="" disabled>Loading jurusan...</option>
+                  ) : (
+                    jurusanList
+                      .filter(j => j.isActive && j._count && j._count.siswa > 0)
+                      .map(jurusan => (
+                        <option key={jurusan.id} value={jurusan.id}>
+                          {jurusan.nama}
+                        </option>
+                      ))
+                  )}
+                </select>
+                <p className="text-xs text-slate-400 ml-4 mt-2 font-semibold">
+                  💡 Import/Export nilai untuk jurusan tertentu
+                  {jurusanList.filter(j => j.isActive && j._count && j._count.siswa > 0).length > 0 && 
+                    ` • ${jurusanList.filter(j => j.isActive && j._count && j._count.siswa > 0).length} jurusan tersedia`}
+                </p>
+              </div>
+
+              {/* Filter Semester */}
+              <div className="mt-6">
+                <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4 mb-3 block">
+                  Filter Semester (Opsional)
+                </label>
+                <select
+                  value={selectedSemester}
+                  onChange={(e) => setSelectedSemester(e.target.value)}
+                  className="w-full h-16 px-6 rounded-3xl bg-white border-4 border-slate-50 focus:border-indigo-200 font-bold text-slate-700 shadow-sm appearance-none"
+                >
+                  <option value="">Semua Semester</option>
+                  {[1, 2, 3, 4, 5, 6].map(sem => (
+                    <option key={sem} value={sem}>
+                      Semester {sem}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-400 ml-4 mt-2 font-semibold">
+                  📊 Import/Export nilai semester tertentu
+                </p>
+              </div>
             </motion.div>
 
             {/* ACTION BUTTON (3D CLICK) */}
@@ -254,13 +397,50 @@ export default function DataNilaiPage() {
                   
                   <div className="space-y-6 relative z-10">
                     <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 flex items-center justify-between">
-                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Terproses</p>
-                      <p className="text-5xl font-black text-indigo-600 tracking-tighter">{result.successCount}</p>
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Total Rows</p>
+                      <p className="text-5xl font-black text-slate-600 tracking-tighter">{result.data?.summary?.totalRows || 0}</p>
+                    </div>
+                    <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-green-100 flex items-center justify-between">
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Berhasil</p>
+                      <p className="text-5xl font-black text-green-600 tracking-tighter">{result.data?.summary?.successCount || 0}</p>
+                    </div>
+                    <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-blue-100 flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Created</p>
+                        <p className="text-xs font-bold text-blue-600 italic">{result.data?.summary?.createdCount || 0} nilai baru</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Updated</p>
+                        <p className="text-xs font-bold text-purple-600 italic">{result.data?.summary?.updatedCount || 0} nilai</p>
+                      </div>
                     </div>
                     <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 flex items-center justify-between">
-                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">NISN Hilang</p>
-                      <p className="text-5xl font-black text-amber-500 tracking-tighter">{result.notFoundCount}</p>
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">NISN Tidak Ditemukan</p>
+                      <p className="text-5xl font-black text-amber-500 tracking-tighter">{result.data?.summary?.notFoundCount || 0}</p>
                     </div>
+                    {result.data?.summary?.errorCount > 0 && (
+                      <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-red-100 flex items-center justify-between">
+                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Errors</p>
+                        <p className="text-5xl font-black text-red-500 tracking-tighter">{result.data.summary.errorCount}</p>
+                      </div>
+                    )}
+                    {result.data?.detection?.subjects && result.data.detection.subjects.length > 0 && (
+                      <div className="bg-gradient-to-br from-purple-50 to-blue-50 p-8 rounded-[3rem] border-2 border-purple-100">
+                        <p className="text-[10px] font-black uppercase text-purple-900 tracking-widest mb-4 flex items-center gap-2">
+                          <Sparkles size={14} /> Mata Pelajaran Terdeteksi
+                        </p>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {result.data.detection.subjects.map((subj: { column: number; name: string }) => (
+                            <div key={subj.column} className="flex items-center justify-between p-3 bg-white rounded-2xl">
+                              <span className="font-bold text-sm text-slate-700">{subj.name}</span>
+                              <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-lg font-black text-xs">
+                                Col {subj.column}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}

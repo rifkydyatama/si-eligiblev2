@@ -17,7 +17,26 @@ export async function GET() {
       orderBy: {
         nama: 'asc'
       },
-      include: {
+      select: {
+        id: true,
+        nisn: true,
+        nama: true,
+        kelas: true,
+        statusKIPK: true,
+        mendaftarKIPK: true,
+        email: true,
+        noTelepon: true,
+        createdAt: true,
+        updatedAt: true,
+        jurusanSekolah: {
+          select: {
+            id: true,
+            kode: true,
+            nama: true,
+            tingkat: true,
+            isActive: true
+          }
+        },
         _count: {
           select: {
             nilaiRapor: true
@@ -43,7 +62,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { nisn, nama, tanggalLahir, kelas, jurusan, email, noTelepon, statusKIPK } = body;
+    const { nisn, nama, tanggalLahir, kelas, jurusanId, email, noTelepon, statusKIPK } = body;
 
     // Validasi NISN
     if (!nisn || nisn.length !== 10) {
@@ -66,20 +85,29 @@ export async function POST(request: NextRequest) {
         nama,
         tanggalLahir: new Date(tanggalLahir),
         kelas,
-        jurusan,
+        jurusanId: jurusanId || null,
         email: email || null,
         noTelepon: noTelepon || null,
         statusKIPK: statusKIPK || false
+      },
+      include: {
+        jurusanSekolah: true
       }
     });
 
     // Log audit
     await prisma.auditLog.create({
       data: {
-        userId: session.user.userId,
+        userId: session.user.userId || 'system',
         userType: session.user.role,
         action: 'create_siswa',
-        description: `Menambahkan siswa baru: ${nama} (${nisn})`
+        description: `Menambahkan siswa baru: ${nama} (${nisn})`,
+        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
+        metadata: {
+          siswaId: siswa.id,
+          nisn: siswa.nisn,
+          nama: siswa.nama
+        }
       }
     });
 

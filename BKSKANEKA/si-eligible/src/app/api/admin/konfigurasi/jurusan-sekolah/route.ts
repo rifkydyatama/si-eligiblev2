@@ -77,7 +77,15 @@ export async function POST(request: NextRequest) {
         userId: session.user.userId,
         userType: session.user.role,
         action: 'create_jurusan_sekolah',
-        description: `Menambahkan jurusan sekolah: ${nama} (${kode})`
+        description: `Menambahkan jurusan sekolah: ${nama} (${kode})`,
+        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
+        metadata: {
+          jurusanId: newJurusan.id,
+          kode,
+          nama,
+          tingkat,
+          isActive
+        }
       }
     });
 
@@ -144,7 +152,15 @@ export async function PUT(request: NextRequest) {
         userId: session.user.userId,
         userType: session.user.role,
         action: 'update_jurusan_sekolah',
-        description: `Update jurusan sekolah: ${nama} (${kode})`
+        description: `Update jurusan sekolah: ${nama} (${kode})`,
+        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
+        metadata: {
+          id,
+          kode,
+          nama,
+          tingkat,
+          isActive
+        }
       }
     });
 
@@ -198,7 +214,11 @@ export async function DELETE(request: NextRequest) {
         userId: session.user.userId,
         userType: session.user.role,
         action: 'delete_jurusan_sekolah',
-        description: `Hapus jurusan sekolah ID: ${id}`
+        description: `Hapus jurusan sekolah ID: ${id}`,
+        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
+        metadata: {
+          jurusanId: id
+        }
       }
     });
 

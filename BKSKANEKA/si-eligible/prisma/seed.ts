@@ -28,10 +28,11 @@ async function main() {
       nama: 'Siswa Demo',
       tanggalLahir: new Date('2007-05-15'),
       kelas: '12',
-      jurusan: 'IPA',
+      jurusanId: null,
       email: 'siswa@example.com',
       noTelepon: '08123456789',
       statusKIPK: false,
+      mendaftarKIPK: false,
       isDataLocked: false,
     },
   });

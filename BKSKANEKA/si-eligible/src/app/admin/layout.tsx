@@ -28,6 +28,7 @@ import {
   ChevronRight,
   Sparkles,
   ShieldCheck,
+  GraduationCap,
   Zap,
   Menu,
   X,
@@ -78,6 +79,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/sanggahan', icon: <AlertTriangle size={20} />, label: 'Sanggahan' },
     { href: '/admin/kampus', icon: <School size={20} />, label: 'Master Kampus' },
     { href: '/admin/monitoring', icon: <BarChart3 size={20} />, label: 'Monitoring' },
+    { href: '/admin/kelas-management', icon: <GraduationCap size={20} />, label: 'Manajemen Kelas' },
     { href: '/admin/export', icon: <Download size={20} />, label: 'Export Data' },
     { href: '/admin/konfigurasi', icon: <Settings size={20} />, label: 'Konfigurasi' },
   ];

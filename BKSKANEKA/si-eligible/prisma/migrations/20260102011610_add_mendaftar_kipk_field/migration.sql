@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `Siswa` ADD COLUMN `mendaftarKIPK` BOOLEAN NOT NULL DEFAULT false;

@@ -1,24 +1,49 @@
 // src/app/admin/siswa/tambah/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+
+interface JurusanSekolah {
+  id: string;
+  kode: string;
+  nama: string;
+  tingkat: string;
+  isActive: boolean;
+}
 
 export default function TambahSiswaPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [jurusanList, setJurusanList] = useState<JurusanSekolah[]>([]);
 
   const [formData, setFormData] = useState({
     nisn: '',
     nama: '',
     tanggalLahir: '',
     kelas: '',
-    jurusan: '',
+    jurusanId: '',
     email: '',
     noTelepon: '',
     statusKIPK: false
   });
+
+  useEffect(() => {
+    fetchJurusan();
+  }, []);
+
+  const fetchJurusan = async () => {
+    try {
+      const res = await fetch('/api/admin/konfigurasi/jurusan-sekolah');
+      if (res.ok) {
+        const data = await res.json();
+        setJurusanList(data.filter((j: JurusanSekolah) => j.isActive));
+      }
+    } catch (error) {
+      console.error('Error fetching jurusan:', error);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,15 +163,15 @@ export default function TambahSiswaPage() {
                   Jurusan <span className="text-red-500">*</span>
                 </label>
                 <select
-                  value={formData.jurusan}
-                  onChange={(e) => setFormData({ ...formData, jurusan: e.target.value })}
+                  value={formData.jurusanId}
+                  onChange={(e) => setFormData({ ...formData, jurusanId: e.target.value })}
                   required
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   <option value="">Pilih Jurusan</option>
-                  <option value="IPA">IPA</option>
-                  <option value="IPS">IPS</option>
-                  <option value="Bahasa">Bahasa</option>
+                  {jurusanList.map(j => (
+                    <option key={j.id} value={j.id}>{j.nama} ({j.kode})</option>
+                  ))}
                 </select>
               </div>
             </div>

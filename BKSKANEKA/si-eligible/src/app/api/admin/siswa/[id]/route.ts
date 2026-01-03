@@ -21,7 +21,13 @@ export async function GET(
     const siswa = await prisma.siswa.findUnique({
       where: { id },
       include: {
+        jurusanSekolah: true, // Include relasi jurusan sekolah
         nilaiRapor: {
+          where: {
+            mataPelajaran: {
+              notIn: ['A', 'S', 'I', 'a', 's', 'i']
+            }
+          },
           orderBy: [
             { semester: 'asc' },
             { mataPelajaran: 'asc' }
@@ -68,7 +74,7 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
-    const { nama, tanggalLahir, kelas, jurusan, email, noTelepon, statusKIPK } = body;
+    const { nama, tanggalLahir, kelas, jurusanId, email, noTelepon, statusKIPK } = body;
 
     const siswa = await prisma.siswa.update({
       where: { id },
@@ -76,20 +82,29 @@ export async function PUT(
         nama,
         tanggalLahir: tanggalLahir ? new Date(tanggalLahir) : undefined,
         kelas,
-        jurusan,
+        jurusanId: jurusanId || null, // Update dengan jurusanId bukan jurusan
         email: email || null,
         noTelepon: noTelepon || null,
         statusKIPK
+      },
+      include: {
+        jurusanSekolah: true // Include jurusan sekolah dalam response
       }
     });
 
     // Log audit
     await prisma.auditLog.create({
       data: {
-        userId: session.user.userId,
+        userId: session.user.userId || 'system',
         userType: session.user.role,
         action: 'update_siswa',
-        description: `Mengupdate data siswa: ${siswa.nama} (${siswa.nisn})`
+        description: `Mengupdate data siswa: ${siswa.nama} (${siswa.nisn})`,
+        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
+        metadata: {
+          siswaId: siswa.id,
+          nisn: siswa.nisn,
+          nama: siswa.nama
+        }
       }
     });
 
@@ -128,10 +143,16 @@ export async function DELETE(
     // Log audit
     await prisma.auditLog.create({
       data: {
-        userId: session.user.userId,
+        userId: session.user.userId || 'system',
         userType: session.user.role,
         action: 'delete_siswa',
-        description: `Menghapus siswa: ${siswa.nama} (${siswa.nisn})`
+        description: `Menghapus siswa: ${siswa.nama} (${siswa.nisn})`,
+        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
+        metadata: {
+          siswaId: siswa.id,
+          nisn: siswa.nisn,
+          nama: siswa.nama
+        }
       }
     });
 

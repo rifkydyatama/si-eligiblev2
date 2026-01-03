@@ -82,10 +82,16 @@ export async function POST(request: NextRequest) {
     // Log audit
     await prisma.auditLog.create({
       data: {
-        userId: session.user.userId,
+        userId: session.user.userId || 'system',
         userType: session.user.role,
-        action: 'update_konfigurasi_nilai',
-        description: `Update konfigurasi nilai: ${kurikulum} - ${jalur}`
+        action: 'create_konfigurasi_nilai',
+        description: `Menambahkan konfigurasi nilai: ${kurikulum} - ${jalur}`,
+        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
+        metadata: {
+          konfigurasiId: konfigurasi.id,
+          kurikulum,
+          jalur
+        }
       }
     });
 

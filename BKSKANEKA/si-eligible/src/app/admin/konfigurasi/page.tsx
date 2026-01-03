@@ -130,6 +130,7 @@ export default function KonfigurasiPage() {
     { id: 'nilai', label: 'Bobot Nilai', icon: <BarChart3 size={18} /> },
     { id: 'kuota', label: 'Kuota Eligible', icon: <Target size={18} /> },
     { id: 'jurusan', label: 'Jurusan Sekolah', icon: <School size={18} /> },
+    { id: 'mapping', label: 'Mapping Mapel', icon: <Layers size={18} /> },
     { id: 'export', label: 'Ekstraksi', icon: <FileOutput size={18} /> },
   ];
 
@@ -182,7 +183,7 @@ export default function KonfigurasiPage() {
 
         {/* --- BENTO NAVIGATION TABS --- */}
         <nav className="mb-12">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
                 {tabs.map((tab) => (
                     <motion.button
                         key={tab.id}
@@ -229,6 +230,7 @@ export default function KonfigurasiPage() {
                     {activeTab === 'nilai' && <KonfigurasiNilaiSection />}
                     {activeTab === 'kuota' && <KonfigurasiKuotaSection />}
                     {activeTab === 'jurusan' && <JurusanSekolahSection />}
+                    {activeTab === 'mapping' && <MataPelajaranMappingSection />}
                     {activeTab === 'export' && <TemplateExportSection />}
                 </motion.div>
             </AnimatePresence>
@@ -443,8 +445,8 @@ function PeriodeJalurSection() {
     const fetchData = useCallback(async () => {
         try {
             const [taRes, pjRes] = await Promise.all([
-                fetch('/api/konfigurasi/tahun-akademik'),
-                fetch('/api/konfigurasi/periode-jalur')
+                fetch('/api/admin/konfigurasi/tahun-akademik'),
+                fetch('/api/admin/konfigurasi/periode-jalur')
             ]);
             
             if (taRes.ok) {
@@ -485,7 +487,7 @@ function PeriodeJalurSection() {
 
         setLoading({ ...loading, [jalur]: true });
         try {
-            const res = await fetch('/api/konfigurasi/periode-jalur', {
+            const res = await fetch('/api/admin/konfigurasi/periode-jalur', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -620,7 +622,7 @@ function KonfigurasiNilaiSection() {
 
         setLoading(true);
         try {
-            const res = await fetch('/api/konfigurasi/nilai', {
+            const res = await fetch('/api/admin/konfigurasi/nilai', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -746,7 +748,7 @@ function KonfigurasiKuotaSection() {
 
         setLoading(true);
         try {
-            const res = await fetch('/api/konfigurasi/kuota', {
+            const res = await fetch('/api/admin/konfigurasi/kuota', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1063,7 +1065,7 @@ function JurusanSekolahSection() {
                             </div>
                             <div className="md:col-span-5">
                                 <p className="text-base font-black text-slate-800">{item.nama}</p>
-                                {item._count && item._count.siswa > 0 && (
+                                npx prisma generate                                {item._count && item._count.siswa > 0 && (
                                     <p className="text-xs font-bold text-slate-400 mt-1">
                                         {item._count.siswa} siswa terdaftar
                                     </p>
@@ -1121,7 +1123,503 @@ function JurusanSekolahSection() {
     );
 }
 
-// 6. TEMPLATE EXPORT SECTION
+// 6. MAPPING MATA PELAJARAN SECTION
+function MataPelajaranMappingSection() {
+    interface MataPelajaranMapping {
+        id?: string;
+        semester: number;
+        kolomDapodik: string;
+        kolomPDSS: string;
+        kolomPTKIN: string;
+        namaMapel: string;
+        kategori: 'wajib' | 'peminatan' | 'lintas_minat';
+        kurikulum: 'Merdeka' | '2013';
+        jurusanId?: string;
+    }
+
+    const [mappings, setMappings] = useState<MataPelajaranMapping[]>([]);
+    const [selectedSemester, setSelectedSemester] = useState(1);
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [editingMapping, setEditingMapping] = useState<MataPelajaranMapping | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [jurusanList, setJurusanList] = useState<JurusanSekolah[]>([]);
+
+    // Template upload state
+    const [uploadType, setUploadType] = useState<'PDSS' | 'PTKIN'>('PDSS');
+    const [uploading, setUploading] = useState(false);
+    const [templateStatus, setTemplateStatus] = useState<any>(null);
+
+    const fetchMappings = useCallback(async () => {
+        try {
+            const res = await fetch(`/api/admin/konfigurasi/mapel-mapping?semester=${selectedSemester}`);
+            if (res.ok) {
+                const data = await res.json();
+                setMappings(data);
+            }
+        } catch (e) {
+            console.error('Error fetching mappings:', e);
+        }
+    }, [selectedSemester]);
+
+    const fetchJurusan = useCallback(async () => {
+        try {
+            const res = await fetch('/api/admin/konfigurasi/jurusan-sekolah');
+            if (res.ok) {
+                const data = await res.json();
+                setJurusanList(data);
+            }
+        } catch (e) {
+            console.error('Error fetching jurusan:', e);
+        }
+    }, []);
+
+    const fetchTemplateStatus = useCallback(async () => {
+        try {
+            const res = await fetch('/api/admin/template/list');
+            if (res.ok) {
+                const result = await res.json();
+                setTemplateStatus(result.data);
+            }
+        } catch (e) {
+            console.error('Error fetching template status:', e);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchMappings();
+        fetchJurusan();
+        fetchTemplateStatus();
+    }, [fetchMappings, fetchJurusan, fetchTemplateStatus]);
+
+    const handleAdd = () => {
+        setEditingMapping({
+            semester: selectedSemester,
+            kolomDapodik: '',
+            kolomPDSS: '',
+            kolomPTKIN: '',
+            namaMapel: '',
+            kategori: 'wajib',
+            kurikulum: 'Merdeka'
+        });
+        setShowAddModal(true);
+    };
+
+    const handleEdit = (mapping: MataPelajaranMapping) => {
+        setEditingMapping({ ...mapping });
+        setShowAddModal(true);
+    };
+
+    const handleSave = async () => {
+        if (!editingMapping) return;
+
+        setLoading(true);
+        try {
+            const method = editingMapping.id ? 'PUT' : 'POST';
+            const res = await fetch('/api/admin/konfigurasi/mapel-mapping', {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(editingMapping)
+            });
+
+            if (res.ok) {
+                await fetchMappings();
+                setShowAddModal(false);
+                setEditingMapping(null);
+            }
+        } catch (e) {
+            console.error('Error saving mapping:', e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm('Hapus mapping ini?')) return;
+
+        try {
+            const res = await fetch(`/api/admin/konfigurasi/mapel-mapping?id=${id}`, {
+                method: 'DELETE'
+            });
+
+            if (res.ok) {
+                await fetchMappings();
+            }
+        } catch (e) {
+            console.error('Error deleting mapping:', e);
+        }
+    };
+
+    const handleTemplateUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('type', uploadType);
+
+            const res = await fetch('/api/admin/template/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                alert(`✅ Template ${uploadType} berhasil diupload!\n\n` +
+                      `📊 Total kolom: ${data.template.totalColumns}\n` +
+                      `📚 Mata pelajaran terdeteksi: ${data.template.mapelDetected}\n` +
+                      `🔄 Auto-sync ke sistem: AKTIF\n\n` +
+                      `Mapping otomatis tersimpan dan siap digunakan untuk:\n` +
+                      `• Import nilai dari Dapodik\n` +
+                      `• Export ke sistem ${uploadType}\n` +
+                      `• Dashboard siswa`);
+                
+                // Refresh mappings setelah upload
+                await fetchMappings();
+                await fetchTemplateStatus();
+            }
+        } catch (e) {
+            console.error('Error uploading template:', e);
+            alert('❌ Gagal upload template');
+        } finally {
+            setUploading(false);
+            e.target.value = '';
+        }
+    };
+
+    const handleDownloadTemplate = async () => {
+        try {
+            const res = await fetch(`/api/admin/template/upload?type=${uploadType}`);
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Template_${uploadType}_${Date.now()}.xlsx`;
+            a.click();
+        } catch (e) {
+            console.error('Error downloading template:', e);
+        }
+    };
+
+    const handleExportNilai = async () => {
+        try {
+            const res = await fetch('/api/admin/nilai/export-excel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: uploadType })
+            });
+
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Export_Nilai_${uploadType}_${Date.now()}.xlsx`;
+            a.click();
+        } catch (e) {
+            console.error('Error exporting nilai:', e);
+        }
+    };
+
+    return (
+        <div className="space-y-8">
+            <div className="bg-white rounded-[2.5rem] p-8 md:p-14 shadow-2xl border-8 border-white/50 relative overflow-hidden">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
+                    <div>
+                        <h2 className="text-3xl md:text-4xl font-black uppercase tracking-tighter text-slate-950 mb-3">
+                            Mapping Mata Pelajaran
+                        </h2>
+                        <p className="text-sm text-slate-400 font-bold uppercase tracking-widest">
+                            Konfigurasi pemetaan Dapodik → PDSS/PTKIN
+                        </p>
+                    </div>
+                    <Button
+                        onClick={handleAdd}
+                        className="h-16 px-8 bg-purple-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-[0_8px_0_0_#7c3aed] active:shadow-none active:translate-y-2 flex items-center gap-3"
+                    >
+                        <Plus size={20} /> Tambah Mapping
+                    </Button>
+                </div>
+
+                {/* Upload & Export Templates */}
+                <div className="grid md:grid-cols-2 gap-6 mb-8 p-6 bg-purple-50 rounded-3xl border-2 border-purple-100">
+                    <div className="space-y-4">
+                        <h3 className="text-lg font-black uppercase tracking-wider text-purple-900">Upload Template Excel</h3>
+                        
+                        {/* Status Template */}
+                        {templateStatus && (
+                            <div className="p-4 bg-white rounded-2xl border-2 border-purple-100 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-slate-500">Status Sync</span>
+                                    <div className="flex gap-2">
+                                        {templateStatus.syncStatus?.pdss && (
+                                            <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-black rounded-lg">
+                                                PDSS ✓
+                                            </span>
+                                        )}
+                                        {templateStatus.syncStatus?.ptkin && (
+                                            <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-black rounded-lg">
+                                                PTKIN ✓
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="text-xs text-slate-400">
+                                    Template PDSS: {templateStatus.pdss?.length || 0} | 
+                                    PTKIN: {templateStatus.ptkin?.length || 0} | 
+                                    Mapping: {templateStatus.mappingCount || 0}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex gap-4">
+                            <label className="cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="templateType"
+                                    value="PDSS"
+                                    checked={uploadType === 'PDSS'}
+                                    onChange={() => setUploadType('PDSS')}
+                                    className="mr-2"
+                                />
+                                <span className="font-bold">PDSS</span>
+                            </label>
+                            <label className="cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="templateType"
+                                    value="PTKIN"
+                                    checked={uploadType === 'PTKIN'}
+                                    onChange={() => setUploadType('PTKIN')}
+                                    className="mr-2"
+                                />
+                                <span className="font-bold">PTKIN</span>
+                            </label>
+                        </div>
+                        <input
+                            type="file"
+                            accept=".xlsx,.xls"
+                            onChange={handleTemplateUpload}
+                            disabled={uploading}
+                            className="block w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-purple-600 file:text-white hover:file:bg-purple-700 file:cursor-pointer disabled:opacity-50"
+                        />
+                        {uploading && (
+                            <div className="flex items-center gap-2 text-sm text-purple-600">
+                                <RefreshCcw size={16} className="animate-spin" />
+                                <span>Uploading & auto-mapping...</span>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="space-y-4">
+                        <h3 className="text-lg font-black uppercase tracking-wider text-purple-900">Download & Export</h3>
+                        <div className="flex gap-3">
+                            <Button
+                                onClick={handleDownloadTemplate}
+                                className="flex-1 h-12 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 flex items-center justify-center gap-2"
+                            >
+                                <Download size={16} /> Template Kosong
+                            </Button>
+                            <Button
+                                onClick={handleExportNilai}
+                                className="flex-1 h-12 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 flex items-center justify-center gap-2"
+                            >
+                                <FileOutput size={16} /> Export Nilai
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Semester Tabs */}
+                <div className="flex gap-3 mb-6 overflow-x-auto pb-3">
+                    {[1, 2, 3, 4, 5].map(sem => (
+                        <button
+                            key={sem}
+                            onClick={() => setSelectedSemester(sem)}
+                            className={`px-8 py-4 rounded-2xl font-black uppercase tracking-widest transition-all ${
+                                selectedSemester === sem
+                                    ? 'bg-purple-600 text-white shadow-lg'
+                                    : 'bg-white text-slate-400 border-2 border-slate-100 hover:border-purple-200'
+                            }`}
+                        >
+                            Semester {sem}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Mappings Table */}
+                <div className="space-y-4">
+                    {mappings.map((mapping, idx) => (
+                        <motion.div
+                            key={mapping.id || idx}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: idx * 0.05 }}
+                            className="grid md:grid-cols-12 gap-4 items-center p-6 bg-slate-50 rounded-2xl border-2 border-slate-100 hover:border-purple-200 transition-all"
+                        >
+                            <div className="md:col-span-2">
+                                <p className="text-xs text-slate-400 uppercase font-bold mb-1">Mata Pelajaran</p>
+                                <p className="font-black text-slate-900">{mapping.namaMapel}</p>
+                            </div>
+                            <div className="md:col-span-2">
+                                <p className="text-xs text-slate-400 uppercase font-bold mb-1">Kolom Dapodik</p>
+                                <p className="font-bold text-slate-600 text-sm">{mapping.kolomDapodik}</p>
+                            </div>
+                            <div className="md:col-span-2">
+                                <p className="text-xs text-slate-400 uppercase font-bold mb-1">Kolom PDSS</p>
+                                <p className="font-bold text-purple-600 text-sm">{mapping.kolomPDSS}</p>
+                            </div>
+                            <div className="md:col-span-2">
+                                <p className="text-xs text-slate-400 uppercase font-bold mb-1">Kolom PTKIN</p>
+                                <p className="font-bold text-blue-600 text-sm">{mapping.kolomPTKIN}</p>
+                            </div>
+                            <div className="md:col-span-2">
+                                <p className="text-xs text-slate-400 uppercase font-bold mb-1">Kategori</p>
+                                <span className={`inline-block px-3 py-1 rounded-lg text-xs font-black uppercase ${
+                                    mapping.kategori === 'wajib' ? 'bg-green-100 text-green-700' :
+                                    mapping.kategori === 'peminatan' ? 'bg-purple-100 text-purple-700' :
+                                    'bg-blue-100 text-blue-700'
+                                }`}>
+                                    {mapping.kategori}
+                                </span>
+                            </div>
+                            <div className="md:col-span-2 flex gap-2 justify-end">
+                                <button
+                                    onClick={() => handleEdit(mapping)}
+                                    className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center"
+                                >
+                                    <Award size={16} />
+                                </button>
+                                <button
+                                    onClick={() => mapping.id && handleDelete(mapping.id)}
+                                    className="w-10 h-10 rounded-xl bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        </motion.div>
+                    ))}
+                </div>
+
+                {mappings.length === 0 && (
+                    <div className="text-center py-20">
+                        <div className="w-20 h-20 bg-slate-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                            <Layers size={40} className="text-slate-300" />
+                        </div>
+                        <p className="text-slate-400 font-bold text-sm uppercase tracking-widest">
+                            Belum ada mapping untuk semester {selectedSemester}
+                        </p>
+                    </div>
+                )}
+            </div>
+
+            {/* Add/Edit Modal */}
+            <AnimatePresence>
+                {showAddModal && editingMapping && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4"
+                        onClick={() => setShowAddModal(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-white rounded-[2.5rem] p-10 max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+                        >
+                            <h3 className="text-3xl font-black uppercase mb-8 text-slate-950">
+                                {editingMapping.id ? 'Edit' : 'Tambah'} Mapping Mata Pelajaran
+                            </h3>
+
+                            <div className="space-y-6">
+                                <div className="grid md:grid-cols-2 gap-6">
+                                    <SmartInput
+                                        label="Nama Mata Pelajaran"
+                                        value={editingMapping.namaMapel}
+                                        onChange={(e) => setEditingMapping({ ...editingMapping, namaMapel: e.target.value })}
+                                        placeholder="Matematika"
+                                    />
+                                    <SmartSelect
+                                        label="Semester"
+                                        options={['1', '2', '3', '4', '5']}
+                                        value={editingMapping.semester.toString()}
+                                        onChange={(e) => setEditingMapping({ ...editingMapping, semester: parseInt(e.target.value) })}
+                                    />
+                                </div>
+
+                                <div className="grid md:grid-cols-3 gap-6">
+                                    <SmartInput
+                                        label="Kolom Dapodik"
+                                        value={editingMapping.kolomDapodik}
+                                        onChange={(e) => setEditingMapping({ ...editingMapping, kolomDapodik: e.target.value })}
+                                        placeholder="MTK_SEM1"
+                                    />
+                                    <SmartInput
+                                        label="Kolom PDSS"
+                                        value={editingMapping.kolomPDSS}
+                                        onChange={(e) => setEditingMapping({ ...editingMapping, kolomPDSS: e.target.value })}
+                                        placeholder="MTK_1"
+                                    />
+                                    <SmartInput
+                                        label="Kolom PTKIN"
+                                        value={editingMapping.kolomPTKIN}
+                                        onChange={(e) => setEditingMapping({ ...editingMapping, kolomPTKIN: e.target.value })}
+                                        placeholder="MATEMATIKA_SEM1"
+                                    />
+                                </div>
+
+                                <div className="grid md:grid-cols-3 gap-6">
+                                    <SmartSelect
+                                        label="Kategori"
+                                        options={['wajib', 'peminatan', 'lintas_minat']}
+                                        value={editingMapping.kategori}
+                                        onChange={(e) => setEditingMapping({ ...editingMapping, kategori: e.target.value as any })}
+                                    />
+                                    <SmartSelect
+                                        label="Kurikulum"
+                                        options={['Merdeka', '2013']}
+                                        value={editingMapping.kurikulum}
+                                        onChange={(e) => setEditingMapping({ ...editingMapping, kurikulum: e.target.value as any })}
+                                    />
+                                    <SmartSelect
+                                        label="Jurusan (Opsional)"
+                                        options={['', ...jurusanList.map(j => j.nama)]}
+                                        value={jurusanList.find(j => j.id === editingMapping.jurusanId)?.nama || ''}
+                                        onChange={(e) => {
+                                            const jurusan = jurusanList.find(j => j.nama === e.target.value);
+                                            setEditingMapping({ ...editingMapping, jurusanId: jurusan?.id });
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="flex gap-4 pt-6">
+                                    <Button
+                                        onClick={() => setShowAddModal(false)}
+                                        className="flex-1 h-16 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-200"
+                                    >
+                                        Batal
+                                    </Button>
+                                    <Button
+                                        onClick={handleSave}
+                                        disabled={loading}
+                                        className="flex-1 h-16 bg-purple-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-[0_8px_0_0_#7c3aed] active:shadow-none active:translate-y-2 disabled:opacity-50"
+                                    >
+                                        {loading ? <RefreshCcw size={18} className="animate-spin" /> : 'Simpan'}
+                                    </Button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
+
+// 7. TEMPLATE EXPORT SECTION
 function TemplateExportSection() {
     const [templates, setTemplates] = useState<TemplateConfig[]>([]);
     const [editingTemplate, setEditingTemplate] = useState<TemplateConfig | null>(null);
@@ -1344,7 +1842,11 @@ function TemplateExportSection() {
                                             <input 
                                                 type="checkbox"
                                                 checked={m.wajib}
-                                                onChange={(e) => updateMapping(idx, 'wajib', e.target.checked.toString())}
+                                                onChange={(e) => {
+                                                    const newMapping = [...editingTemplate.mapping];
+                                                    newMapping[idx] = { ...newMapping[idx], wajib: e.target.checked };
+                                                    setEditingTemplate({ ...editingTemplate, mapping: newMapping });
+                                                }}
                                                 className="w-6 h-6 rounded-lg"
                                             />
                                         </div>

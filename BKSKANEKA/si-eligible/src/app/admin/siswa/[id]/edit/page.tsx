@@ -33,14 +33,22 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-// --- DATA CONTRACT (SAME AS LOGIC) ---
+// --- DATA CONTRACT ---
+interface JurusanSekolah {
+  id: string;
+  kode: string;
+  nama: string;
+  tingkat: string;
+  isActive: boolean;
+}
+
 interface SiswaData {
   id: string;
   nisn: string;
   nama: string;
   tanggalLahir: string;
   kelas: string;
-  jurusan: string;
+  jurusanSekolah: JurusanSekolah | null;
   email: string | null;
   noTelepon: string | null;
   statusKIPK: boolean;
@@ -55,13 +63,14 @@ export default function EditSiswaPage() {
   const [fetchLoading, setFetchLoading] = useState(true);
   const [error, setError] = useState('');
   const [academicYear, setAcademicYear] = useState("");
+  const [jurusanList, setJurusanList] = useState<JurusanSekolah[]>([]);
   
   const [formData, setFormData] = useState({
     nisn: '',
     nama: '',
     tanggalLahir: '',
     kelas: '',
-    jurusan: '',
+    jurusanId: '',
     email: '',
     noTelepon: '',
     statusKIPK: false
@@ -73,12 +82,25 @@ export default function EditSiswaPage() {
     const month = now.getMonth() + 1;
     setAcademicYear(month >= 7 ? `${now.getFullYear()}/${now.getFullYear() + 1}` : `${now.getFullYear() - 1}/${now.getFullYear()}`);
     
+    fetchJurusan();
     if (params.id) {
       fetchSiswaData();
     }
   }, [params.id]);
 
-  // --- DATABASE FETCHING (NO CHANGES IN LOGIC) ---
+  const fetchJurusan = async () => {
+    try {
+      const res = await fetch('/api/admin/konfigurasi/jurusan-sekolah');
+      if (res.ok) {
+        const data = await res.json();
+        setJurusanList(data.filter((j: JurusanSekolah) => j.isActive));
+      }
+    } catch (error) {
+      console.error('Error fetching jurusan:', error);
+    }
+  };
+
+  // --- DATABASE FETCHING ---
   const fetchSiswaData = async () => {
     try {
       const res = await fetch(`/api/admin/siswa/${params.id}`);
@@ -89,7 +111,7 @@ export default function EditSiswaPage() {
           nama: siswa.nama,
           tanggalLahir: siswa.tanggalLahir.split('T')[0],
           kelas: siswa.kelas,
-          jurusan: siswa.jurusan,
+          jurusanId: siswa.jurusanSekolah?.id || '',
           email: siswa.email || '',
           noTelepon: siswa.noTelepon || '',
           statusKIPK: siswa.statusKIPK
@@ -272,15 +294,15 @@ export default function EditSiswaPage() {
                     <div className="space-y-3">
                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Jurusan</label>
                       <select
-                        value={formData.jurusan}
-                        onChange={(e) => setFormData({ ...formData, jurusan: e.target.value })}
+                        value={formData.jurusanId}
+                        onChange={(e) => setFormData({ ...formData, jurusanId: e.target.value })}
                         required
                         className="w-full h-16 px-6 rounded-2xl bg-slate-50 border-none focus:ring-4 focus:ring-blue-500/10 transition-all font-bold text-slate-700 shadow-inner cursor-pointer"
                       >
                         <option value="">Pilih</option>
-                        <option value="IPA">IPA</option>
-                        <option value="IPS">IPS</option>
-                        <option value="Bahasa">Bahasa</option>
+                        {jurusanList.map(j => (
+                          <option key={j.id} value={j.id}>{j.nama} ({j.kode})</option>
+                        ))}
                       </select>
                     </div>
                   </div>

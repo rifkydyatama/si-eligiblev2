@@ -22,6 +22,9 @@ export async function GET(request: NextRequest) {
       const nilai = await prisma.nilaiRapor.findMany({
         where: { 
           siswaId,
+          mataPelajaran: {
+            notIn: ['A', 'S', 'I', 'a', 's', 'i']
+          },
           ...(unverifiedOnly && { isVerified: false })
         },
         orderBy: [
@@ -42,7 +45,12 @@ export async function GET(request: NextRequest) {
     } else {
       // Get all unverified nilai for admin verification
       const nilai = await prisma.nilaiRapor.findMany({
-        where: { isVerified: false },
+        where: { 
+          isVerified: false,
+          mataPelajaran: {
+            notIn: ['A', 'S', 'I', 'a', 's', 'i']
+          }
+        },
         orderBy: [
           { siswa: { nama: 'asc' } },
           { semester: 'asc' },

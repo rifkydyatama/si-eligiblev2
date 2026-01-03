@@ -59,17 +59,40 @@ const itemVariants = {
     opacity: 1, 
     y: 0, 
     scale: 1,
-    transition: { type: "spring", stiffness: 100, damping: 15 }
+    transition: { type: "spring" as const, stiffness: 100, damping: 15 }
   }
 };
+
+// --- SUB-COMPONENTS ---
+function AnomalyCard({ label, count }: { label: string; count: number }) {
+  return (
+    <div className="bg-white rounded-2xl p-6 border border-red-200 shadow-sm">
+      <div className="text-3xl font-black text-red-600 mb-2">{count}</div>
+      <div className="text-xs font-bold text-slate-600 uppercase tracking-wide">{label}</div>
+    </div>
+  );
+}
 
 export default function AdminDashboard() {
   // 1. STATE MANAGEMENT
   const [stats, setStats] = useState({
     totalSiswa: 0,
+    totalKIPK: 0,
+    totalMendaftarKIPK: 0,
+    totalNeuralKIPK: 0,
+    totalKelas12: 0,
     totalNilaiVerified: 0,
     totalSanggahanPending: 0,
     totalKelulusan: 0
+  });
+  
+  const [anomalies, setAnomalies] = useState({
+    totalAnomalies: 0,
+    nisnDuplicates: 0,
+    namaDuplicates: 0,
+    emailDuplicates: 0,
+    phoneDuplicates: 0,
+    anomalies: []
   });
   
   const [recentActivities, setRecentActivities] = useState([]);
@@ -101,6 +124,13 @@ export default function AdminDashboard() {
       const statsRes = await fetch('/api/admin/stats');
       const statsData = await statsRes.json();
       setStats(statsData);
+
+      // Sinkronisasi Deteksi Anomali
+      const anomalyRes = await fetch('/api/admin/stats/anomalies');
+      if (anomalyRes.ok) {
+        const anomalyData = await anomalyRes.json();
+        setAnomalies(anomalyData);
+      }
 
       // Sinkronisasi Sanggahan Pending (Model Rebuttal)
       const rebuttalRes = await fetch('/api/admin/sanggahan?status=pending');
@@ -221,6 +251,77 @@ export default function AdminDashboard() {
             sub="Siswa Eligible"
           />
         </motion.section>
+
+        {/* DATA ANOMALY DETECTION SECTION */}
+        {anomalies.totalAnomalies > 0 && (
+          <motion.section 
+            variants={itemVariants}
+            initial="hidden"
+            animate="visible"
+            className="mb-12 bg-gradient-to-br from-red-50 to-orange-50 rounded-[3rem] p-10 border border-red-200 shadow-[0_20px_50px_rgba(239,68,68,0.1)]"
+          >
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-6">
+                <div className="p-5 bg-red-500 text-white rounded-3xl shadow-lg shadow-red-500/30">
+                  <AlertCircle size={32} />
+                </div>
+                <div>
+                  <h2 className="text-3xl font-black text-red-900 tracking-tight">Anomali Data Terdeteksi</h2>
+                  <p className="text-red-600 font-bold text-sm mt-1">Sistem mendeteksi {anomalies.totalAnomalies} potensi duplikasi atau inkonsistensi data</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+              <AnomalyCard label="NISN Duplikat" count={anomalies.nisnDuplicates} />
+              <AnomalyCard label="Nama Duplikat" count={anomalies.namaDuplicates} />
+              <AnomalyCard label="Email Duplikat" count={anomalies.emailDuplicates} />
+              <AnomalyCard label="Telepon Duplikat" count={anomalies.phoneDuplicates} />
+            </div>
+
+            <div className="space-y-4 max-h-96 overflow-y-auto">
+              {anomalies.anomalies.map((anomaly: any, idx: number) => (
+                <div 
+                  key={idx} 
+                  className="bg-white rounded-2xl p-6 border border-red-200 shadow-sm"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${
+                        anomaly.type === 'NISN_DUPLICATE' ? 'bg-red-100 text-red-700' :
+                        anomaly.type === 'NAMA_DUPLICATE' ? 'bg-orange-100 text-orange-700' :
+                        anomaly.type === 'EMAIL_DUPLICATE' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-blue-100 text-blue-700'
+                      }`}>
+                        {anomaly.type.replace('_', ' ')}
+                      </span>
+                      <span className="font-bold text-slate-700">{anomaly.value}</span>
+                    </div>
+                    <span className="text-sm font-bold text-slate-400">{anomaly.count} data</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {anomaly.students.map((student: any) => (
+                      <Link 
+                        key={student.id} 
+                        href={`/admin/siswa/${student.id}`}
+                        className="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors group"
+                      >
+                        <div>
+                          <div className="font-bold text-slate-800">{student.nama}</div>
+                          <div className="text-xs text-slate-500 font-mono">{student.nisn}</div>
+                          {student.email && <div className="text-xs text-blue-600 mt-1">{student.email}</div>}
+                          {student.noTelepon && <div className="text-xs text-green-600">{student.noTelepon}</div>}
+                        </div>
+                        <ChevronRight size={16} className="text-slate-400 group-hover:translate-x-1 transition-transform" />
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.section>
+        )}
 
         {/* CORE BENTO INTERFACE */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
@@ -431,7 +532,7 @@ function StatCard({ label, value, icon, color, sub }: any) {
         {icon}
       </div>
       <div className="text-6xl font-black text-slate-900 tracking-tighter mb-2 leading-none">
-        {value.toLocaleString()}
+        {(value ?? 0).toLocaleString()}
       </div>
       <div>
         <div className="text-sm font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-1">{label}</div>

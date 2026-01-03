@@ -201,7 +201,7 @@ export default function DetailKampusPage() {
                 <Cpu size={14} className="text-blue-400" /> {kampus.kodeKampus}
               </div>
               <Link href="/admin/kampus">
-                <Button variant="ghost" className="h-8 rounded-full text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 hover:bg-slate-50 transition-all">
+                <Button variant="outline" className="h-8 rounded-full text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 hover:bg-slate-50 transition-all">
                   <ArrowLeft size={14} className="mr-1" /> Back
                 </Button>
               </Link>

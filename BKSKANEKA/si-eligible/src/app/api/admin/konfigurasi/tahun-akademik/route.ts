@@ -123,7 +123,14 @@ export async function POST(request: NextRequest) {
             userId: session.user.userId,
             userType: session.user.role,
             action: 'create_tahun_akademik',
-            description: `Menambahkan tahun akademik: ${tahun}`
+            description: `Menambahkan tahun akademik: ${tahun}`,
+            ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
+            metadata: {
+              tahun,
+              tanggalMulai,
+              tanggalSelesai,
+              isActive
+            }
           }
         });
       } else {
@@ -216,7 +223,15 @@ export async function PUT(request: NextRequest) {
             userId: session.user.userId,
             userType: session.user.role,
             action: 'update_tahun_akademik',
-            description: `Mengupdate tahun akademik: ${updatedTahunAkademik.tahun}`
+            description: `Mengupdate tahun akademik: ${updatedTahunAkademik.tahun}`,
+            ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
+            metadata: {
+              id,
+              tahun,
+              tanggalMulai,
+              tanggalSelesai,
+              isActive
+            }
           }
         });
       }
@@ -296,7 +311,14 @@ export async function DELETE(request: NextRequest) {
             userId: session.user.userId,
             userType: session.user.role,
             action: 'delete_tahun_akademik',
-            description: `Menghapus tahun akademik: ${existing.tahun}`
+            description: `Menghapus tahun akademik: ${existing.tahun}`,
+            ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
+            metadata: {
+              id,
+              tahun: existing.tahun,
+              tanggalMulai: existing.tanggalMulai,
+              tanggalSelesai: existing.tanggalSelesai
+            }
           }
         });
       }

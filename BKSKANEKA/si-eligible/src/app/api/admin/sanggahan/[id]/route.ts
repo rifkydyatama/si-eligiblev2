@@ -16,7 +16,7 @@ export async function PUT(
     }
 
     const { id } = await params;
-    const { status, keterangan } = await request.json();
+    const { status, alasan } = await request.json();
 
     const sanggahan = await prisma.sanggahan.findUnique({
       where: { id },
@@ -27,42 +27,56 @@ export async function PUT(
       return NextResponse.json({ error: 'Sanggahan tidak ditemukan' }, { status: 404 });
     }
 
-    // Update sanggahan
-    const updated = await prisma.sanggahan.update({
-      where: { id },
-      data: {
-        status,
-        keterangan: keterangan || null,
-        reviewedBy: session.user.userId,
-        reviewedAt: new Date()
-      }
-    });
-
-    // Jika approved, update nilai di database
-    if (status === 'approved') {
-      await prisma.nilaiRapor.updateMany({
-        where: {
-          siswaId: sanggahan.siswaId,
-          semester: sanggahan.semester,
-          mataPelajaran: sanggahan.mataPelajaran
-        },
+    // Gunakan transaction untuk update atomic
+    const result = await prisma.$transaction(async (tx) => {
+      // Update sanggahan
+      const updated = await tx.sanggahan.update({
+        where: { id },
         data: {
-          nilai: sanggahan.nilaiBaru
+          status,
+          alasan: status === 'rejected' ? (alasan || 'Tidak ada alasan yang diberikan') : null,
+          reviewedBy: session.user.userId,
+          reviewedAt: new Date()
         }
       });
-    }
 
-    // Log audit
-    await prisma.auditLog.create({
-      data: {
-        userId: session.user.userId,
-        userType: session.user.role,
-        action: status === 'approved' ? 'approve_sanggahan' : 'reject_sanggahan',
-        description: `${status === 'approved' ? 'Menyetujui' : 'Menolak'} sanggahan ${sanggahan.siswa.nama} - ${sanggahan.mataPelajaran}`
+      // Jika approved, update nilai di database dan set isVerified = true
+      if (status === 'approved') {
+        await tx.nilaiRapor.updateMany({
+          where: {
+            siswaId: sanggahan.siswaId,
+            semester: sanggahan.semester,
+            mataPelajaran: sanggahan.mataPelajaran
+          },
+          data: {
+            nilai: sanggahan.nilaiBaru,
+            isVerified: true  // Set verified setelah approved
+          }
+        });
       }
+
+      // Log audit dalam transaction
+      await tx.auditLog.create({
+        data: {
+          userId: session.user.userId || 'system',
+          userType: session.user.role,
+          action: status === 'approved' ? 'approve_sanggahan' : 'reject_sanggahan',
+          description: `${status === 'approved' ? 'Menyetujui' : 'Menolak'} sanggahan ${sanggahan.siswa.nama} - ${sanggahan.mataPelajaran}`,
+          ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
+          metadata: {
+            sangahanId: sanggahan.id,
+            siswaId: sanggahan.siswaId,
+            mataPelajaran: sanggahan.mataPelajaran,
+            semester: sanggahan.semester,
+            status
+          }
+        }
+      });
+
+      return updated;
     });
 
-    return NextResponse.json(updated);
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error updating sanggahan:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

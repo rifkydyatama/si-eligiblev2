@@ -81,10 +81,15 @@ export async function POST(request: NextRequest) {
     // Log audit
     await prisma.auditLog.create({
       data: {
-        userId: session.user.userId,
+        userId: session.user.userId || 'system',
         userType: session.user.role,
         action: 'create_tahun_akademik',
-        description: `Menambahkan tahun akademik: ${tahun}`
+        description: `Menambahkan tahun akademik: ${tahun}`,
+        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
+        metadata: {
+          tahunAkademikId: tahunAkademik.id,
+          tahun: tahunAkademik.tahun
+        }
       }
     });
 

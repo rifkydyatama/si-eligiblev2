@@ -31,7 +31,8 @@ import {
   Image as ImageIcon,
   ExternalLink,
   Info,
-  History
+  History,
+  GraduationCap
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
@@ -106,13 +107,13 @@ export default function SanggahanPage() {
     } catch (error) { console.error(error); }
   };
 
-  const handleReject = async (keterangan: string) => {
+  const handleReject = async (alasan: string) => {
     if (!selectedSanggahan) return;
     try {
       const res = await fetch(`/api/admin/sanggahan/${selectedSanggahan.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'rejected', keterangan })
+        body: JSON.stringify({ status: 'rejected', alasan })
       });
       if (res.ok) {
         setShowModal(false);
@@ -279,7 +280,7 @@ export default function SanggahanPage() {
 
 // --- SUB COMPONENT: MODAL JUDGE ---
 function ReviewModal({ sanggahan, onApprove, onReject, onClose }: any) {
-  const [keterangan, setKeterangan] = useState('');
+  const [alasan, setAlasan] = useState('');
   const [showRejectForm, setShowRejectForm] = useState(false);
 
   return (
@@ -338,13 +339,25 @@ function ReviewModal({ sanggahan, onApprove, onReject, onClose }: any) {
               <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
                 <ImageIcon size={18} /> Verifikasi Visual Bukti Rapor
               </h3>
-              <a href={sanggahan.buktiRapor} target="_blank" rel="noopener noreferrer" className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2 hover:underline">
-                <ExternalLink size={12} /> Open High-Res
-              </a>
+              {sanggahan.buktiRapor && (
+                <a href={sanggahan.buktiRapor} target="_blank" rel="noopener noreferrer" className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2 hover:underline">
+                  <ExternalLink size={12} /> Open High-Res
+                </a>
+              )}
             </div>
             <div className="bg-slate-900 rounded-[3rem] p-4 shadow-inner relative group">
-              <img src={sanggahan.buktiRapor} alt="Evidence" className="w-full h-auto rounded-[2rem] object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
-              <div className="absolute inset-0 rounded-[3rem] shadow-[inset_0_0_100px_rgba(0,0,0,0.2)] pointer-events-none" />
+              {sanggahan.buktiRapor ? (
+                <>
+                  <img src={sanggahan.buktiRapor} alt="Evidence" className="w-full h-auto rounded-[2rem] object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
+                  <div className="absolute inset-0 rounded-[3rem] shadow-[inset_0_0_100px_rgba(0,0,0,0.2)] pointer-events-none" />
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
+                  <ImageIcon size={64} className="text-slate-600 mb-4 opacity-30" />
+                  <p className="text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Tidak Ada Bukti Rapor</p>
+                  <p className="text-xs text-slate-400 font-medium">Siswa belum mengupload foto/screenshot rapor</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -372,15 +385,15 @@ function ReviewModal({ sanggahan, onApprove, onReject, onClose }: any) {
                 <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-widest text-red-400 ml-2">Alasan Penolakan (Wajib)</label>
                   <textarea
-                    value={keterangan}
-                    onChange={(e) => setKeterangan(e.target.value)}
+                    value={alasan}
+                    onChange={(e) => setAlasan(e.target.value)}
                     placeholder="Contoh: Bukti foto tidak jelas atau buram..."
                     rows={4}
                     className="w-full p-8 rounded-[2rem] bg-slate-50 border-none focus:ring-4 focus:ring-red-500/10 transition-all font-bold text-slate-700 shadow-inner"
                   />
                 </div>
                 <div className="flex gap-4">
-                  <button onClick={() => { if(keterangan.trim()) onReject(keterangan); else alert('Alasan harus diisi'); }} className="flex-[2] py-6 bg-red-500 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-[0_8px_0_0_#b91c1c] active:shadow-none active:translate-y-2 transition-all">Kirim Penolakan</button>
+                  <button onClick={() => { if(alasan.trim()) onReject(alasan); else alert('Alasan harus diisi'); }} className="flex-[2] py-6 bg-red-500 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-[0_8px_0_0_#b91c1c] active:shadow-none active:translate-y-2 transition-all">Kirim Penolakan</button>
                   <button onClick={() => setShowRejectForm(false)} className="flex-1 py-6 bg-slate-100 text-slate-400 rounded-2xl font-black text-sm uppercase tracking-widest">Batal</button>
                 </div>
               </motion.div>

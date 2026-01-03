@@ -1,10 +1,8 @@
 // src/app/api/auth/[...nextauth]/route.ts
 import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { prisma } from "../../../../lib/prisma";
+import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-
-// use shared prisma instance from src/lib/prisma
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -28,6 +26,11 @@ export const authOptions: NextAuthOptions = {
           throw new Error("NISN tidak ditemukan");
         }
 
+        // ⚠️ KELAS RESTRICTION: Hanya kelas XII yang bisa login
+        if (!siswa.kelas.startsWith('XII')) {
+          throw new Error("Akses ditolak. Hanya siswa kelas XII yang dapat login ke sistem.");
+        }
+
         const tanggalLahir = new Date(siswa.tanggalLahir)
           .toISOString()
           .split('T')[0];
@@ -41,7 +44,8 @@ export const authOptions: NextAuthOptions = {
           name: siswa.nama,
           email: siswa.nisn,
           role: "siswa",
-          nisn: siswa.nisn
+          nisn: siswa.nisn,
+          kelas: siswa.kelas
         };
       }
     }),

@@ -70,10 +70,16 @@ export async function POST(request: NextRequest) {
     // Log audit
     await prisma.auditLog.create({
       data: {
-        userId: session.user.userId,
+        userId: session.user.userId || 'system',
         userType: session.user.role,
         action: 'create_periode_jalur',
-        description: `Menambahkan periode jalur: ${namaJalur}`
+        description: `Menambahkan periode jalur: ${namaJalur}`,
+        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || null,
+        metadata: {
+          periodeId: periode.id,
+          jalur,
+          namaJalur
+        }
       }
     });
 
